@@ -5,6 +5,11 @@ of the
 [Networking in Public Cloud Deployments](https://www.ipspace.net/PubCloud/)
 course during spring of 2020.
 
+This repository fulfills a dual purpose:
+
+1. To submit solutions to the course exercises.
+2. As a reference for me (and potentially others).
+
 ---
 
 [My GitHub user page](https://github.com/auerswal) |
