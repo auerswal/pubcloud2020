@@ -12,7 +12,7 @@ This repository fulfills a dual purpose:
 
 ## Links to the Exercise Solutions
 
-1. [Define the Requirements](ex1-reqs)
+1. [Define the Requirements](ex1-reqs/)
 
 ---
 
