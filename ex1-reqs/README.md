@@ -3,8 +3,8 @@
 The first exercise is about defining requirements for a cloud deployment.
 While it is suggested to use a real project,
 I do not have this possibility.
-I will instead use a fictitious project inspired by real opportunities
-aligned with the course objectives.
+I will instead use a fictitious project inspired by real opportunities,
+but aligned with the course objectives.
 
 ## Cloud Provider for Exercises
 
@@ -49,7 +49,8 @@ offering, e.g.,
 
 A possible use for an EC2 instance would be hosting the content management
 system in the cloud,
-but starting the instance only when needed instead of always running it.
+but starting the instance only when needed instead of always running it,
+to avoid gratuitous expenses.
 The content could be stored using a DBaaS offering,
 allowing to create an EC2 instance on-demand from a pre-built image.
 The equivalent of a Chromebook might then suffice for content creators.
@@ -59,7 +60,7 @@ and instead focus on learning the course content.
 The course content relies on several virtual machines
 (e.g., EC2 instances)
 using different virtual networks
-(e.g., [VPC](https://aws.amazon.com/vpc/))
+(e.g., [VPC](https://aws.amazon.com/vpc/)s)
 with differing connectivity requirements.
 
 ### Fiction
@@ -75,6 +76,11 @@ and thus *should not* be used.
 
 The exercise contains a list of questions.
 Answers to those describe the requirements for the public cloud deployment.
+
+I try to keep the requirements independent from actual implementations.
+For example, instead of proscribing use of HTTPS and two-factor authentication
+in order to change web site content,
+the requirement is that only authorized personnel may change web content.
 
 ### What services should the public cloud deployment offer to the customers?
 
@@ -94,7 +100,7 @@ Answers to those describe the requirements for the public cloud deployment.
 
 #### What data is shared with other applications? Where will the data reside?
 
-* All the data is dedicated to the web site.
+* All the content data is dedicated to the web site.
 * The web site content storage should provide
   [ACID](https://en.wikipedia.org/wiki/ACID)
   properties.
@@ -152,11 +158,11 @@ I do not know this yet since I am at the start of this journey. ☺
 
 Anyway, whenever some existing requirement changes,
 or a new requirement emerges,
-There is a real risk to overlook existing requirements
+there is a real risk to overlook existing requirements
 when searching for a solution for an unexpected problem resulting in new
 requirements.
-It is necessary to verify that the adjusted solution still fulfills the
-pre-exisitng and still valid requirements.
+It is necessary to verify that the adjusted solution fulfills the
+still valid pre-existing requirements.
 
 ---
 
