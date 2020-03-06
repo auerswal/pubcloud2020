@@ -10,6 +10,10 @@ This repository fulfills a dual purpose:
 1. To submit solutions to the course exercises.
 2. As a reference for me (and potentially others).
 
+## Links to the Exercise Solutions
+
+1. [Define the Requirements](ex1-reqs)
+
 ---
 
 [My GitHub user page](https://github.com/auerswal) |
