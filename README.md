@@ -13,6 +13,7 @@ This repository fulfills a dual purpose:
 ## Links to the Exercise Solutions
 
 1. [Define the Requirements](ex1-reqs/)
+2. [Simple Infrastructure-as-Code Setup](ex2-iac/)
 
 ---
 
