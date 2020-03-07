@@ -506,7 +506,7 @@ Changes to an AWS CloudFormation stack are applied with the
     +---------+--------------------------------------------------------------------------------------------------------+
 
 The name of the VPC was changed,
-as can be seen both in the stack and vpc descriptions:
+as can be seen both in the stack and VPC descriptions:
 
     $ aws cloudformation describe-stacks
     ------------------------------------------------------------------------------------------------------------------------------
@@ -583,8 +583,8 @@ and use `aws cloudformation update-stack` again:
     |  StackId|  arn:aws:cloudformation:eu-central-1:143440624024:stack/ex2-cfn/57063780-608a-11ea-911a-029363dcbd8e   |
     +---------+--------------------------------------------------------------------------------------------------------+
 
-Now the VPC needed to be destroyed and recreated,
-because the prefix was changed
+Now the VPC needs to be destroyed and recreated,
+because the prefix is changed
 (this is described in the documentation).
 As a result a different VPC ID than before can be seen:
 
@@ -687,6 +687,33 @@ I use the `aws cloudformation delete-stack` command for this:
     ----------------
     |DescribeStacks|
     +--------------+
+
+Now there are no more non-default VPCs:
+
+    $ aws ec2 describe-vpcs --filter Name=isDefault,Values=false
+    --------------
+    |DescribeVpcs|
+    +------------+
+    $ aws ec2 describe-vpcs
+    ---------------------------------------------------------------------------------------------------
+    |                                          DescribeVpcs                                           |
+    +-------------------------------------------------------------------------------------------------+
+    ||                                             Vpcs                                              ||
+    |+---------------+----------------+------------------+------------+-------------+----------------+|
+    ||   CidrBlock   | DhcpOptionsId  | InstanceTenancy  | IsDefault  |    State    |     VpcId      ||
+    |+---------------+----------------+------------------+------------+-------------+----------------+|
+    ||  172.31.0.0/16|  dopt-983cf3f2 |  default         |  True      |  available  |  vpc-7f13dc15  ||
+    |+---------------+----------------+------------------+------------+-------------+----------------+|
+    |||                                   CidrBlockAssociationSet                                   |||
+    ||+--------------------------------------------------------+------------------------------------+||
+    |||                      AssociationId                     |             CidrBlock              |||
+    ||+--------------------------------------------------------+------------------------------------+||
+    |||  vpc-cidr-assoc-f576a99e                               |  172.31.0.0/16                     |||
+    ||+--------------------------------------------------------+------------------------------------+||
+    ||||                                      CidrBlockState                                       ||||
+    |||+----------------------------------+--------------------------------------------------------+|||
+    ||||  State                           |  associated                                            ||||
+    |||+----------------------------------+--------------------------------------------------------+|||
 
 This concludes the AWS CloudFormation part of the exercise.
 
