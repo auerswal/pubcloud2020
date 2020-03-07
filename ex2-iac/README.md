@@ -103,8 +103,6 @@ Thus I will use two VPCs for this exercise:
 2. Use Terraform to create a VPC with prefix `10.47.0.0/16`
    and name `tf-vpc`.
 
-### Create a Single Public Cloud Resource
-
 I want to create an
 [Amazon Virtual Private Cloud](https://aws.amazon.com/vpc/)
 (VPC).
@@ -185,21 +183,525 @@ Afterwards the AWS CLI is ready for use:
     ||||  State        |  associated              ||||
     |||+---------------+--------------------------+|||
 
-#### AWS CloudFormation
+AWS CLI configuration is saved in the directory `~/.aws/`:
 
-#### Terraform
+    $ ls ~/.aws
+    config  credentials
+    $ cat ~/.aws/config
+    [default]
+    region = eu-central-1
+    output = table
+    $ sed -E 's/^([^=]+= ?).*$/\1<redacted>/' ~/.aws/credentials
+    [default]
+    aws_access_key_id = <redacted>
+    aws_secret_access_key = <redacted>
 
-### Change the Created Resource
+Using `aws configure` without options has created a configuration for
+the `default` profile.
 
-#### AWS CloudFormation
+### AWS CloudFormation
 
-#### Terraform
+First I will use AWS CloudFormation for this exercise.
 
-### Remove the Created Resource
+AWS CloudFormation uses a model of *stacks*
+that are deployed based on *templates*.
+Templates can be parameterized.
 
-#### AWS CloudFormation
+While AWS CloudFormation can be used via web frontend,
+I intend to use it via AWS CLI
+using the command `cloudformation`
+with its subcommands for individual actions.
 
-#### Terraform
+I write a template named
+[vpc-template.yaml](cloudformation/vpc-template.yaml)
+that describes a single VPC
+with one IPv4 prefix.
+The template contains parameters for
+the prefix and a name.
+The default values specified in the template are used,
+if no parameters are given
+when using the template.
+Other VPC properties are hard-coded in the template.
+
+The template can be validated using `aws cloudformation validate-template`:
+
+    $ aws cloudformation validate-template --template-body file://vpc-template.yaml
+    --------------------------------------------------------------------------------
+    |                               ValidateTemplate                               |
+    +------------------+-----------------------------------------------------------+
+    |  Description     |  Basic Virtual Private Cloud (VPC) template               |
+    +------------------+-----------------------------------------------------------+
+    ||                                 Parameters                                 ||
+    |+--------------+----------------------------------+---------+----------------+|
+    || DefaultValue |           Description            | NoEcho  | ParameterKey   ||
+    |+--------------+----------------------------------+---------+----------------+|
+    ||  10.0.0.0/16 |  IPv4 prefix (CIDR notation)     |  False  |  Ipv4Prefix    ||
+    ||  unnamed     |  Name for this VPC (tag "name")  |  False  |  Name          ||
+    |+--------------+----------------------------------+---------+----------------+|
+
+Parameters can be given in *shorthand* or *JSON* syntax, but not *YAML* format
+(at least for the AWS CLI version I have).
+While shorthand syntax can only be provided as argument(s) to the
+`--parameters` option,
+JSON syntax can either be given as properly quoted argument to `--parameters`,
+or read from file using `--parameters file://<path_to_file>`.
+
+I have written two files to specify the initial parameters
+to demonstrate the two different formats:
+
+1. [01-initial-parameters](cloudformation/01-initial-parameters)
+2. [01-initial-parameters.json](cloudformation/01-initial-parameters.json)
+
+The option `--generate-cli-skeleton output` to the AWS CLI command
+`aws cloudformation create-stack` can be used to validate
+a template together with its parameters.
+
+#### Create a Single Public Cloud Resource
+
+In the beginning there are no stacks:
+
+    $ aws cloudformation describe-stacks
+    ----------------
+    |DescribeStacks|
+    +--------------+
+
+There is a default VPC only:
+
+    $ aws ec2 describe-vpcs 
+    --------------------------------------------------
+    |                  DescribeVpcs                  |
+    +------------------------------------------------+
+    ||                     Vpcs                     ||
+    |+-----------------------+----------------------+|
+    ||  CidrBlock            |  172.31.0.0/16       ||
+    ||  DhcpOptionsId        |  dopt-983cf3f2       ||
+    ||  InstanceTenancy      |  default             ||
+    ||  IsDefault            |  True                ||
+    ||  State                |  available           ||
+    ||  VpcId                |  vpc-7f13dc15        ||
+    |+-----------------------+----------------------+|
+    |||           CidrBlockAssociationSet          |||
+    ||+----------------+---------------------------+||
+    |||  AssociationId |  vpc-cidr-assoc-f576a99e  |||
+    |||  CidrBlock     |  172.31.0.0/16            |||
+    ||+----------------+---------------------------+||
+    ||||              CidrBlockState              ||||
+    |||+---------------+--------------------------+|||
+    ||||  State        |  associated              ||||
+    |||+---------------+--------------------------+|||
+
+First I validate the input parameters.
+This only validates the basic syntax,
+there can still be errors contained in the template or parameters,
+e.g., an invalid parameter type.
+Those kinds of errors can be seen by using the
+`aws cloudformation describe-stacks` command
+soon enough to still see the `ROLLBACK_IN_PROGRESS` status
+with the associated `StackStatusReason`.
+
+Every AWS CloudFormation stack needs a name;
+I choose `ex2-cfn`.
+I validate the stack creation command three times,
+each using a different way to specify the template parameters:
+
+    $ aws cloudformation create-stack --stack-name ex2-cfn --template-body file://vpc-template.yaml --parameters $(< 01-initial-parameters) --generate-cli-skeleton output
+    ------------------------
+    |      CreateStack     |
+    +----------+-----------+
+    |  StackId |  StackId  |
+    +----------+-----------+
+    $ aws cloudformation create-stack --stack-name ex2-cfn --template-body file://vpc-template.yaml --parameters "$(< 01-initial-parameters.json)" --generate-cli-skeleton output
+    ------------------------
+    |      CreateStack     |
+    +----------+-----------+
+    |  StackId |  StackId  |
+    +----------+-----------+
+    $ aws cloudformation create-stack --stack-name ex2-cfn --template-body file://vpc-template.yaml --parameters file://01-initial-parameters.json --generate-cli-skeleton output
+    ------------------------
+    |      CreateStack     |
+    +----------+-----------+
+    |  StackId |  StackId  |
+    +----------+-----------+
+
+From now on I will use the `--parameters file://<path_to_file>` variant.
+
+The above commands have not yet created a CloudFormation stack,
+they rather validated the input syntax
+and generated sample output for the `create-stack` command.
+The `create-stack` command prints the *stack ID* on success.
+
+Now it is time to actually create the VPC:
+
+    $ aws cloudformation create-stack --stack-name ex2-cfn --template-body file://vpc-template.yaml --parameters file://01-initial-parameters.json 
+    --------------------------------------------------------------------------------------------------------------------
+    |                                                    CreateStack                                                   |
+    +---------+--------------------------------------------------------------------------------------------------------+
+    |  StackId|  arn:aws:cloudformation:eu-central-1:143440624024:stack/ex2-cfn/57063780-608a-11ea-911a-029363dcbd8e   |
+    +---------+--------------------------------------------------------------------------------------------------------+
+
+The stack status can be checked using `aws cloudformation describe-stacks`:
+
+    $ aws cloudformation describe-stacks
+    ------------------------------------------------------------------------------------------------------------------------------
+    |                                                       DescribeStacks                                                       |
+    +----------------------------------------------------------------------------------------------------------------------------+
+    ||                                                          Stacks                                                          ||
+    |+-----------------+--------------------------------------------------------------------------------------------------------+|
+    ||  CreationTime   |  2020-03-07T15:44:00.029Z                                                                              ||
+    ||  Description    |  Basic Virtual Private Cloud (VPC) template                                                            ||
+    ||  DisableRollback|  False                                                                                                 ||
+    ||  StackId        |  arn:aws:cloudformation:eu-central-1:143440624024:stack/ex2-cfn/57063780-608a-11ea-911a-029363dcbd8e   ||
+    ||  StackName      |  ex2-cfn                                                                                               ||
+    ||  StackStatus    |  CREATE_IN_PROGRESS                                                                                    ||
+    |+-----------------+--------------------------------------------------------------------------------------------------------+|
+    |||                                                       Parameters                                                       |||
+    ||+-------------------------------------------------------+----------------------------------------------------------------+||
+    |||                     ParameterKey                      |                        ParameterValue                          |||
+    ||+-------------------------------------------------------+----------------------------------------------------------------+||
+    |||  Ipv4Prefix                                           |  10.42.0.0/16                                                  |||
+    |||  Name                                                 |  cfn-vpc                                                       |||
+    ||+-------------------------------------------------------+----------------------------------------------------------------+||
+
+After a while the stack is created:
+
+    $ aws cloudformation describe-stacks
+    ------------------------------------------------------------------------------------------------------------------------------
+    |                                                       DescribeStacks                                                       |
+    +----------------------------------------------------------------------------------------------------------------------------+
+    ||                                                          Stacks                                                          ||
+    |+-----------------+--------------------------------------------------------------------------------------------------------+|
+    ||  CreationTime   |  2020-03-07T15:44:00.029Z                                                                              ||
+    ||  Description    |  Basic Virtual Private Cloud (VPC) template                                                            ||
+    ||  DisableRollback|  False                                                                                                 ||
+    ||  StackId        |  arn:aws:cloudformation:eu-central-1:143440624024:stack/ex2-cfn/57063780-608a-11ea-911a-029363dcbd8e   ||
+    ||  StackName      |  ex2-cfn                                                                                               ||
+    ||  StackStatus    |  CREATE_COMPLETE                                                                                       ||
+    |+-----------------+--------------------------------------------------------------------------------------------------------+|
+    |||                                                         Outputs                                                        |||
+    ||+--------------------------------+-----------------------------+---------------------------------------------------------+||
+    |||           Description          |          OutputKey          |                       OutputValue                       |||
+    ||+--------------------------------+-----------------------------+---------------------------------------------------------+||
+    |||  VPC ID                        |  VpcId                      |  vpc-08eabe5942dbb779e                                  |||
+    |||  CIDR Prefix                   |  Prefix                     |  10.42.0.0/16                                           |||
+    ||+--------------------------------+-----------------------------+---------------------------------------------------------+||
+    |||                                                       Parameters                                                       |||
+    ||+-------------------------------------------------------+----------------------------------------------------------------+||
+    |||                     ParameterKey                      |                        ParameterValue                          |||
+    ||+-------------------------------------------------------+----------------------------------------------------------------+||
+    |||  Ipv4Prefix                                           |  10.42.0.0/16                                                  |||
+    |||  Name                                                 |  cfn-vpc                                                       |||
+    ||+-------------------------------------------------------+----------------------------------------------------------------+||
+
+The resulting VPC can be seen with `aws ec2 describe-vpcs`.
+There is the newly create VPC with name `cfn-vpc` and prefix `10.42.0.0/16`
+as well as the default VPC seen before:
+
+    $ aws ec2 describe-vpcs
+    ----------------------------------------------------------------------------------------------------------------------------------------------
+    |                                                                DescribeVpcs                                                                |
+    +--------------------------------------------------------------------------------------------------------------------------------------------+
+    ||                                                                   Vpcs                                                                   ||
+    |+----------------------------------------------------------+-------------------------------------------------------------------------------+|
+    ||  CidrBlock                                               |  10.42.0.0/16                                                                 ||
+    ||  DhcpOptionsId                                           |  dopt-983cf3f2                                                                ||
+    ||  InstanceTenancy                                         |  default                                                                      ||
+    ||  IsDefault                                               |  False                                                                        ||
+    ||  State                                                   |  available                                                                    ||
+    ||  VpcId                                                   |  vpc-08eabe5942dbb779e                                                        ||
+    |+----------------------------------------------------------+-------------------------------------------------------------------------------+|
+    |||                                                         CidrBlockAssociationSet                                                        |||
+    ||+------------------------------------------+---------------------------------------------------------------------------------------------+||
+    |||  AssociationId                           |  vpc-cidr-assoc-002d982b07d1134ba                                                           |||
+    |||  CidrBlock                               |  10.42.0.0/16                                                                               |||
+    ||+------------------------------------------+---------------------------------------------------------------------------------------------+||
+    ||||                                                            CidrBlockState                                                            ||||
+    |||+---------------------------------------------------+----------------------------------------------------------------------------------+|||
+    ||||  State                                            |  associated                                                                      ||||
+    |||+---------------------------------------------------+----------------------------------------------------------------------------------+|||
+    |||                                                                  Tags                                                                  |||
+    ||+-------------------------------+--------------------------------------------------------------------------------------------------------+||
+    |||              Key              |                                                 Value                                                  |||
+    ||+-------------------------------+--------------------------------------------------------------------------------------------------------+||
+    |||  name                         |  cfn-vpc                                                                                               |||
+    |||  aws:cloudformation:stack-id  |  arn:aws:cloudformation:eu-central-1:143440624024:stack/ex2-cfn/57063780-608a-11ea-911a-029363dcbd8e   |||
+    |||  aws:cloudformation:logical-id|  TheVPC                                                                                                |||
+    |||  aws:cloudformation:stack-name|  ex2-cfn                                                                                               |||
+    ||+-------------------------------+--------------------------------------------------------------------------------------------------------+||
+    ||                                                                   Vpcs                                                                   ||
+    |+------------------------------------------------------------------------+-----------------------------------------------------------------+|
+    ||  CidrBlock                                                             |  172.31.0.0/16                                                  ||
+    ||  DhcpOptionsId                                                         |  dopt-983cf3f2                                                  ||
+    ||  InstanceTenancy                                                       |  default                                                        ||
+    ||  IsDefault                                                             |  True                                                           ||
+    ||  State                                                                 |  available                                                      ||
+    ||  VpcId                                                                 |  vpc-7f13dc15                                                   ||
+    |+------------------------------------------------------------------------+-----------------------------------------------------------------+|
+    |||                                                         CidrBlockAssociationSet                                                        |||
+    ||+---------------------------------------------------+------------------------------------------------------------------------------------+||
+    |||  AssociationId                                    |  vpc-cidr-assoc-f576a99e                                                           |||
+    |||  CidrBlock                                        |  172.31.0.0/16                                                                     |||
+    ||+---------------------------------------------------+------------------------------------------------------------------------------------+||
+    ||||                                                            CidrBlockState                                                            ||||
+    |||+---------------------------------------------------+----------------------------------------------------------------------------------+|||
+    ||||  State                                            |  associated                                                                      ||||
+    |||+---------------------------------------------------+----------------------------------------------------------------------------------+|||
+
+Listing of the *default* VPC can be omitted by using a filter:
+
+    $ aws ec2 describe-vpcs --filter Name=isDefault,Values=false
+    ----------------------------------------------------------------------------------------------------------------------------------------------
+    |                                                                DescribeVpcs                                                                |
+    +--------------------------------------------------------------------------------------------------------------------------------------------+
+    ||                                                                   Vpcs                                                                   ||
+    |+----------------------------------------------------------+-------------------------------------------------------------------------------+|
+    ||  CidrBlock                                               |  10.42.0.0/16                                                                 ||
+    ||  DhcpOptionsId                                           |  dopt-983cf3f2                                                                ||
+    ||  InstanceTenancy                                         |  default                                                                      ||
+    ||  IsDefault                                               |  False                                                                        ||
+    ||  State                                                   |  available                                                                    ||
+    ||  VpcId                                                   |  vpc-08eabe5942dbb779e                                                        ||
+    |+----------------------------------------------------------+-------------------------------------------------------------------------------+|
+    |||                                                         CidrBlockAssociationSet                                                        |||
+    ||+------------------------------------------+---------------------------------------------------------------------------------------------+||
+    |||  AssociationId                           |  vpc-cidr-assoc-002d982b07d1134ba                                                           |||
+    |||  CidrBlock                               |  10.42.0.0/16                                                                               |||
+    ||+------------------------------------------+---------------------------------------------------------------------------------------------+||
+    ||||                                                            CidrBlockState                                                            ||||
+    |||+---------------------------------------------------+----------------------------------------------------------------------------------+|||
+    ||||  State                                            |  associated                                                                      ||||
+    |||+---------------------------------------------------+----------------------------------------------------------------------------------+|||
+    |||                                                                  Tags                                                                  |||
+    ||+-------------------------------+--------------------------------------------------------------------------------------------------------+||
+    |||              Key              |                                                 Value                                                  |||
+    ||+-------------------------------+--------------------------------------------------------------------------------------------------------+||
+    |||  name                         |  cfn-vpc                                                                                               |||
+    |||  aws:cloudformation:stack-id  |  arn:aws:cloudformation:eu-central-1:143440624024:stack/ex2-cfn/57063780-608a-11ea-911a-029363dcbd8e   |||
+    |||  aws:cloudformation:logical-id|  TheVPC                                                                                                |||
+    |||  aws:cloudformation:stack-name|  ex2-cfn                                                                                               |||
+    ||+-------------------------------+--------------------------------------------------------------------------------------------------------+||
+
+#### Change the Created Resource
+
+The first change I want to make is to change the name of the VPC
+from `cfn-vpc` to `CloudFormation-VPC`.
+This should modify the existing VPC,
+because it just changes a *tag*.
+
+I write a new parameters file
+[02-changed-name.json](cloudformation/02-changed-name.json)
+containing this change.
+(For real usage I would check in an updated parameters file
+instead of writing a new file.)
+The same template can be used,
+since the change pertains to the parameters only.
+
+Changes to an AWS CloudFormation stack are applied with the
+`aws cloudformation update-stack` command:
+
+    $ aws cloudformation update-stack --stack-name ex2-cfn --use-previous-template --parameters file://02-changed-name.json
+    --------------------------------------------------------------------------------------------------------------------
+    |                                                    UpdateStack                                                   |
+    +---------+--------------------------------------------------------------------------------------------------------+
+    |  StackId|  arn:aws:cloudformation:eu-central-1:143440624024:stack/ex2-cfn/57063780-608a-11ea-911a-029363dcbd8e   |
+    +---------+--------------------------------------------------------------------------------------------------------+
+
+The name of the VPC was changed,
+as can be seen both in the stack and vpc descriptions:
+
+    $ aws cloudformation describe-stacks
+    ------------------------------------------------------------------------------------------------------------------------------
+    |                                                       DescribeStacks                                                       |
+    +----------------------------------------------------------------------------------------------------------------------------+
+    ||                                                          Stacks                                                          ||
+    |+-----------------+--------------------------------------------------------------------------------------------------------+|
+    ||  CreationTime   |  2020-03-07T15:44:00.029Z                                                                              ||
+    ||  Description    |  Basic Virtual Private Cloud (VPC) template                                                            ||
+    ||  DisableRollback|  False                                                                                                 ||
+    ||  LastUpdatedTime|  2020-03-07T16:14:37.737Z                                                                              ||
+    ||  StackId        |  arn:aws:cloudformation:eu-central-1:143440624024:stack/ex2-cfn/57063780-608a-11ea-911a-029363dcbd8e   ||
+    ||  StackName      |  ex2-cfn                                                                                               ||
+    ||  StackStatus    |  UPDATE_COMPLETE                                                                                       ||
+    |+-----------------+--------------------------------------------------------------------------------------------------------+|
+    |||                                                         Outputs                                                        |||
+    ||+--------------------------------+-----------------------------+---------------------------------------------------------+||
+    |||           Description          |          OutputKey          |                       OutputValue                       |||
+    ||+--------------------------------+-----------------------------+---------------------------------------------------------+||
+    |||  VPC ID                        |  VpcId                      |  vpc-08eabe5942dbb779e                                  |||
+    |||  CIDR Prefix                   |  Prefix                     |  10.42.0.0/16                                           |||
+    ||+--------------------------------+-----------------------------+---------------------------------------------------------+||
+    |||                                                       Parameters                                                       |||
+    ||+-------------------------------------------------+----------------------------------------------------------------------+||
+    |||                  ParameterKey                   |                           ParameterValue                             |||
+    ||+-------------------------------------------------+----------------------------------------------------------------------+||
+    |||  Ipv4Prefix                                     |  10.42.0.0/16                                                        |||
+    |||  Name                                           |  CloudFormation-VPC                                                  |||
+    ||+-------------------------------------------------+----------------------------------------------------------------------+||
+    $ aws ec2 describe-vpcs --filter Name=isDefault,Values=false
+    ----------------------------------------------------------------------------------------------------------------------------------------------
+    |                                                                DescribeVpcs                                                                |
+    +--------------------------------------------------------------------------------------------------------------------------------------------+
+    ||                                                                   Vpcs                                                                   ||
+    |+-------------------+----------------------+-------------------------+-----------------+-----------------+---------------------------------+|
+    ||     CidrBlock     |    DhcpOptionsId     |     InstanceTenancy     |    IsDefault    |      State      |              VpcId              ||
+    |+-------------------+----------------------+-------------------------+-----------------+-----------------+---------------------------------+|
+    ||  10.42.0.0/16     |  dopt-983cf3f2       |  default                |  False          |  available      |  vpc-08eabe5942dbb779e          ||
+    |+-------------------+----------------------+-------------------------+-----------------+-----------------+---------------------------------+|
+    |||                                                         CidrBlockAssociationSet                                                        |||
+    ||+----------------------------------------------------------------------------------------------+-----------------------------------------+||
+    |||                                         AssociationId                                        |                CidrBlock                |||
+    ||+----------------------------------------------------------------------------------------------+-----------------------------------------+||
+    |||  vpc-cidr-assoc-002d982b07d1134ba                                                            |  10.42.0.0/16                           |||
+    ||+----------------------------------------------------------------------------------------------+-----------------------------------------+||
+    ||||                                                            CidrBlockState                                                            ||||
+    |||+---------------------------------------------------+----------------------------------------------------------------------------------+|||
+    ||||  State                                            |  associated                                                                      ||||
+    |||+---------------------------------------------------+----------------------------------------------------------------------------------+|||
+    |||                                                                  Tags                                                                  |||
+    ||+-------------------------------+--------------------------------------------------------------------------------------------------------+||
+    |||              Key              |                                                 Value                                                  |||
+    ||+-------------------------------+--------------------------------------------------------------------------------------------------------+||
+    |||  aws:cloudformation:stack-id  |  arn:aws:cloudformation:eu-central-1:143440624024:stack/ex2-cfn/57063780-608a-11ea-911a-029363dcbd8e   |||
+    |||  aws:cloudformation:logical-id|  TheVPC                                                                                                |||
+    |||  aws:cloudformation:stack-name|  ex2-cfn                                                                                               |||
+    |||  name                         |  CloudFormation-VPC                                                                                    |||
+    ||+-------------------------------+--------------------------------------------------------------------------------------------------------+||
+
+Instead of directly updating the stack
+I could have created a *change set*.
+That would have allowed to review the changes before applying them.
+I do not want to do this now.
+Instead I will use the same procedure as before
+to change the prefix from `10.42.0.0/16` to `10.43.0.0/16`.
+I write a new parameter file
+[03-changed-prefix.json](cloudformation/03-changed-prefix.json)
+and use `aws cloudformation update-stack` again:
+
+    $ aws cloudformation update-stack --stack-name ex2-cfn --use-previous-template --parameters file://03-changed-prefix.json
+    --------------------------------------------------------------------------------------------------------------------
+    |                                                    UpdateStack                                                   |
+    +---------+--------------------------------------------------------------------------------------------------------+
+    |  StackId|  arn:aws:cloudformation:eu-central-1:143440624024:stack/ex2-cfn/57063780-608a-11ea-911a-029363dcbd8e   |
+    +---------+--------------------------------------------------------------------------------------------------------+
+
+Now the VPC needed to be destroyed and recreated,
+because the prefix was changed
+(this is described in the documentation).
+As a result a different VPC ID than before can be seen:
+
+    $ aws cloudformation describe-stacks
+    ------------------------------------------------------------------------------------------------------------------------------
+    |                                                       DescribeStacks                                                       |
+    +----------------------------------------------------------------------------------------------------------------------------+
+    ||                                                          Stacks                                                          ||
+    |+-----------------+--------------------------------------------------------------------------------------------------------+|
+    ||  CreationTime   |  2020-03-07T15:44:00.029Z                                                                              ||
+    ||  Description    |  Basic Virtual Private Cloud (VPC) template                                                            ||
+    ||  DisableRollback|  False                                                                                                 ||
+    ||  LastUpdatedTime|  2020-03-07T16:28:31.513Z                                                                              ||
+    ||  StackId        |  arn:aws:cloudformation:eu-central-1:143440624024:stack/ex2-cfn/57063780-608a-11ea-911a-029363dcbd8e   ||
+    ||  StackName      |  ex2-cfn                                                                                               ||
+    ||  StackStatus    |  UPDATE_COMPLETE                                                                                       ||
+    |+-----------------+--------------------------------------------------------------------------------------------------------+|
+    |||                                                         Outputs                                                        |||
+    ||+--------------------------------+-----------------------------+---------------------------------------------------------+||
+    |||           Description          |          OutputKey          |                       OutputValue                       |||
+    ||+--------------------------------+-----------------------------+---------------------------------------------------------+||
+    |||  VPC ID                        |  VpcId                      |  vpc-05741efb99d32e954                                  |||
+    |||  CIDR Prefix                   |  Prefix                     |  10.43.0.0/16                                           |||
+    ||+--------------------------------+-----------------------------+---------------------------------------------------------+||
+    |||                                                       Parameters                                                       |||
+    ||+-------------------------------------------------+----------------------------------------------------------------------+||
+    |||                  ParameterKey                   |                           ParameterValue                             |||
+    ||+-------------------------------------------------+----------------------------------------------------------------------+||
+    |||  Ipv4Prefix                                     |  10.43.0.0/16                                                        |||
+    |||  Name                                           |  CloudFormation-VPC                                                  |||
+    ||+-------------------------------------------------+----------------------------------------------------------------------+||
+    $ aws ec2 describe-vpcs --filter Name=isDefault,Values=false
+    ----------------------------------------------------------------------------------------------------------------------------------------------
+    |                                                                DescribeVpcs                                                                |
+    +--------------------------------------------------------------------------------------------------------------------------------------------+
+    ||                                                                   Vpcs                                                                   ||
+    |+-------------------+----------------------+-------------------------+-----------------+-----------------+---------------------------------+|
+    ||     CidrBlock     |    DhcpOptionsId     |     InstanceTenancy     |    IsDefault    |      State      |              VpcId              ||
+    |+-------------------+----------------------+-------------------------+-----------------+-----------------+---------------------------------+|
+    ||  10.43.0.0/16     |  dopt-983cf3f2       |  default                |  False          |  available      |  vpc-05741efb99d32e954          ||
+    |+-------------------+----------------------+-------------------------+-----------------+-----------------+---------------------------------+|
+    |||                                                         CidrBlockAssociationSet                                                        |||
+    ||+----------------------------------------------------------------------------------------------+-----------------------------------------+||
+    |||                                         AssociationId                                        |                CidrBlock                |||
+    ||+----------------------------------------------------------------------------------------------+-----------------------------------------+||
+    |||  vpc-cidr-assoc-037c8c2a044232183                                                            |  10.43.0.0/16                           |||
+    ||+----------------------------------------------------------------------------------------------+-----------------------------------------+||
+    ||||                                                            CidrBlockState                                                            ||||
+    |||+---------------------------------------------------+----------------------------------------------------------------------------------+|||
+    ||||  State                                            |  associated                                                                      ||||
+    |||+---------------------------------------------------+----------------------------------------------------------------------------------+|||
+    |||                                                                  Tags                                                                  |||
+    ||+-------------------------------+--------------------------------------------------------------------------------------------------------+||
+    |||              Key              |                                                 Value                                                  |||
+    ||+-------------------------------+--------------------------------------------------------------------------------------------------------+||
+    |||  aws:cloudformation:logical-id|  TheVPC                                                                                                |||
+    |||  aws:cloudformation:stack-id  |  arn:aws:cloudformation:eu-central-1:143440624024:stack/ex2-cfn/57063780-608a-11ea-911a-029363dcbd8e   |||
+    |||  aws:cloudformation:stack-name|  ex2-cfn                                                                                               |||
+    |||  name                         |  CloudFormation-VPC                                                                                    |||
+    ||+-------------------------------+--------------------------------------------------------------------------------------------------------+||
+
+#### Remove the Created Resource
+
+As I understand it, a VPC does not incur extra costs,
+but I want to remove it,
+since I do not need it any more.
+I use the `aws cloudformation delete-stack` command for this:
+
+    $ aws cloudformation delete-stack --stack-name ex2-cfn
+    $ aws cloudformation describe-stacks
+    ------------------------------------------------------------------------------------------------------------------------------
+    |                                                       DescribeStacks                                                       |
+    +----------------------------------------------------------------------------------------------------------------------------+
+    ||                                                          Stacks                                                          ||
+    |+-----------------+--------------------------------------------------------------------------------------------------------+|
+    ||  CreationTime   |  2020-03-07T15:44:00.029Z                                                                              ||
+    ||  DeletionTime   |  2020-03-07T16:34:51.610Z                                                                              ||
+    ||  Description    |  Basic Virtual Private Cloud (VPC) template                                                            ||
+    ||  DisableRollback|  False                                                                                                 ||
+    ||  LastUpdatedTime|  2020-03-07T16:28:31.513Z                                                                              ||
+    ||  StackId        |  arn:aws:cloudformation:eu-central-1:143440624024:stack/ex2-cfn/57063780-608a-11ea-911a-029363dcbd8e   ||
+    ||  StackName      |  ex2-cfn                                                                                               ||
+    ||  StackStatus    |  DELETE_IN_PROGRESS                                                                                    ||
+    |+-----------------+--------------------------------------------------------------------------------------------------------+|
+    |||                                                         Outputs                                                        |||
+    ||+--------------------------------+-----------------------------+---------------------------------------------------------+||
+    |||           Description          |          OutputKey          |                       OutputValue                       |||
+    ||+--------------------------------+-----------------------------+---------------------------------------------------------+||
+    |||  VPC ID                        |  VpcId                      |  vpc-05741efb99d32e954                                  |||
+    |||  CIDR Prefix                   |  Prefix                     |  10.43.0.0/16                                           |||
+    ||+--------------------------------+-----------------------------+---------------------------------------------------------+||
+    |||                                                       Parameters                                                       |||
+    ||+-------------------------------------------------+----------------------------------------------------------------------+||
+    |||                  ParameterKey                   |                           ParameterValue                             |||
+    ||+-------------------------------------------------+----------------------------------------------------------------------+||
+    |||  Ipv4Prefix                                     |  10.43.0.0/16                                                        |||
+    |||  Name                                           |  CloudFormation-VPC                                                  |||
+    ||+-------------------------------------------------+----------------------------------------------------------------------+||
+    $ sleep 5m ; aws cloudformation describe-stacks
+    ----------------
+    |DescribeStacks|
+    +--------------+
+
+This concludes the AWS CloudFormation part of the exercise.
+
+### Terraform
+
+I will repeat the exercise
+(with different values than before)
+using Terraform
+to compare it with AWS CloudFormation.
+
+#### Create a Single Public Cloud Resource
+
+#### Change the Created Resource
+
+#### Remove the Created Resource
 
 ---
 

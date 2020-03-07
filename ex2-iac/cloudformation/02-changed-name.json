@@ -1,0 +1,10 @@
+[
+  {
+    "ParameterKey": "Ipv4Prefix",
+    "ParameterValue": "10.42.0.0/16"
+  },
+  {
+    "ParameterKey": "Name",
+    "ParameterValue": "CloudFormation-VPC"
+  }
+]
