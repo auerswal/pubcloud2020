@@ -218,9 +218,9 @@ that describes a single VPC
 with one IPv4 prefix.
 The template contains parameters for
 the prefix and a name.
-The default values specified in the template are used,
-if no parameters are given
-when using the template.
+If no parameters are given
+when using the template,
+the default values specified in the template are used,
 Other VPC properties are hard-coded in the template.
 
 The template can be validated using `aws cloudformation validate-template`:
