@@ -13,7 +13,9 @@ This repository fulfills a dual purpose:
 ## Links to the Exercise Solutions
 
 1. [Define the Requirements](ex1-reqs/)
+   - ruminations on cloud use
 2. [Simple Infrastructure-as-Code Setup](ex2-iac/)
+   - looking at AWS, AWS CloudFormation, and Terraform
 
 ---
 
