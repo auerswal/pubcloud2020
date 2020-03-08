@@ -31,10 +31,10 @@ variable "name" {
 
 # resources - a VPC
 resource "aws_vpc" "TheVPC" {
-  cidr_block = var.prefix
-  enable_dns_support = true
+  cidr_block           = var.prefix
+  enable_dns_support   = true
   enable_dns_hostnames = true
-  instance_tenancy = "default"
+  instance_tenancy     = "default"
   tags = {
     Name = var.name
   }
