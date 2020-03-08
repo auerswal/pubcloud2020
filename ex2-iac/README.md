@@ -207,6 +207,10 @@ The option `--no-paginate` does not work for help in my version of AWS CLI,
 but piping the output through `cat` results in no pager being used:
 `aws help | cat`.
 
+The AWS CLI, written in Python, is slow.
+On my system, `aws help` takes about one second to show any output,
+whereas, e.g., `terraform -help` takes about one tenth of a second.
+
 ### AWS CloudFormation
 
 First I will use AWS CloudFormation for this exercise.
@@ -230,6 +234,13 @@ If no parameters are given
 when using the template,
 the default values specified in the template are used,
 Other VPC properties are hard-coded in the template.
+
+The template conforms to version *2010-09-09* of template specifications,
+which is the only valid version at the time of writing.
+While it is not necessary to explicitly specify the template version,
+it might help in avoiding problems in the future.
+If no template format version is given in a template,
+AWS CloudFormation uses the most current (*latest*) available version.
 
 The template can be validated using `aws cloudformation validate-template`:
 
