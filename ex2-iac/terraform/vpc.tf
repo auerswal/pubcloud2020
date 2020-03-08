@@ -16,6 +16,7 @@
 
 # providers - AWS in this case
 provider "aws" {
+  version = "~> 2.52"
   profile = "default"
   region  = "eu-central-1"
 }
