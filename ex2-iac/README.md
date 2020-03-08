@@ -199,6 +199,14 @@ AWS CLI configuration is saved in the directory `~/.aws/`:
 Using `aws configure` without options has created a configuration for
 the `default` profile.
 
+Reference documentation for AWS CLI usage is built into the program,
+use `aws help` to access it.
+If AWS CLI determines that output is sent to a terminal,
+it automatically sends it through a pager.
+The option `--no-paginate` does not work for help in my version of AWS CLI,
+but piping the output through `cat` results in no pager being used:
+`aws help | cat`.
+
 ### AWS CloudFormation
 
 First I will use AWS CloudFormation for this exercise.
