@@ -794,7 +794,7 @@ the Terraform working directory.
 This step includes downloading the provider binaries for all providers
 used in the configuration.
 In my case the automatic download does not work,
-because of my flakey network connection at home:
+because of my flaky network connection at home:
 
     $ terraform init
     
@@ -1021,7 +1021,7 @@ and `vpc.tf` is a copy of the configuration file
 without variable substitutions.
 The `tfplan` file contains the values from the variable file.
 
-I do not think this is interesting enough to keep in this repositary,
+I do not think this is interesting enough to keep in this repository,
 so I will delete the `plans/01-create-vpc.tfplan` file after use,
 and just use `terraform apply -vars-file <file>`
 for the remainder of this exercise.
@@ -1120,11 +1120,11 @@ First I will change the name from `tf-vpc` to `Terraform-VPC`,
 then I will change the CIDR prefix from `10.47.0.0/16` to `10.48.0.0/16`.
 Again I expect the name (tag) change to keep the existing VPC,
 but the prefix change requires removing and recreating the VPC.
-Instead of using a plan file,
 To do this I write two additional variable files:
 [02-changed-name.tfvars](terraform/02-changed-name.tfvars)
 and
 [03-changed-prefix.tfvars](terraform/03-changed-prefix.tfvars).
+Instead of using a plan file,
 I will just use `terraform apply` with the appropriate variable file:
 
     $ terraform apply -var-file 02-changed-name.tfvars 
@@ -1290,7 +1290,9 @@ changing the CIDR block:
     Prefix = 10.48.0.0/16
     VPC_ID = vpc-03f59f91f9c6797a5
 
-Terraform prominently shows (in red color) that the VPC needs to be
+Terraform prominently shows
+(in red color which is lost during copy&paste)
+that the VPC needs to be
 destroyed and recreated.
 Since Terraform requires confirmation for actually applying a plan,
 unintended actions seem to be avoidable. ☺
@@ -1545,7 +1547,7 @@ and only the default VPC remains:
 
 I have to say that I liked using Terraform.
 It feels more polished than using AWS CloudFormation via AWS CLI.
-I think I may concentrate on Terraform for the following exercises,
+I think I may concentrate on Terraform for the following exercises.
 
 ---
 
