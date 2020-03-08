@@ -1121,6 +1121,10 @@ then I will change the CIDR prefix from `10.47.0.0/16` to `10.48.0.0/16`.
 Again I expect the name (tag) change to keep the existing VPC,
 but the prefix change requires removing and recreating the VPC.
 Instead of using a plan file,
+To do this I write two additional variable files:
+[02-changed-name.tfvars](terraform/02-changed-name.tfvars)
+and
+[03-changed-prefix.tfvars](terraform/03-changed-prefix.tfvars).
 I will just use `terraform apply` with the appropriate variable file:
 
     $ terraform apply -var-file 02-changed-name.tfvars 
