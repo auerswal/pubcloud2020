@@ -87,7 +87,8 @@ playbook.
 
 This exercise requires creating a single public cloud resource,
 e.g., one tenant network
-(VPC in the case of AWS).
+([Amazon Virtual Private Cloud](https://aws.amazon.com/vpc/)
+(VPC) in the case of AWS).
 
 I am going to create two VPCs,
 one using AWS CloudFormation,
@@ -103,11 +104,7 @@ Thus I will use two VPCs for this exercise:
 2. Use Terraform to create a VPC with prefix `10.47.0.0/16`
    and name `tf-vpc`.
 
-I want to create an
-[Amazon Virtual Private Cloud](https://aws.amazon.com/vpc/)
-(VPC).
-Since I want to try out two different IaC tools,
-I want to create two different VPCs.
+In order to compare both tools I want to use similar inputs.
 
 #### Preliminaries
 
@@ -743,11 +740,808 @@ I will repeat the exercise
 using Terraform
 to compare it with AWS CloudFormation.
 
+Terraform uses the *HashiCorp Configuration Language* (HCL)
+to describe infrastructure as code.
+An infrastructure description using HCL is called a *configuration file*
+or just a *configuration*.
+Terraform configurations can be parameterized using *variables*.
+Variables can be stored in files,
+provided via environment variables,
+or specified on the command line.
+A configuration may comprise several files,
+including variable definitions.
+
+An HCL file can comprise more than one cloud provider,
+therefore Terraform is called *platform agnostic*.
+The platform-specific knowledge is contained in so called *providers*.
+Terraform does not add an abstraction layer above different cloud platforms,
+instead it allows combining different cloud platforms in one infrastructure
+description.
+
+While AWS CloudFormation optionally allows creating *change sets*,
+Terraform always creates a *plan* of changes that need to be approved
+prior to applying them.
+
+Terraform can use the AWS CLI credentials file `~/.aws/credentials`
+and will do so by default.
+It will not use the AWS CLI configuration file `~/.aws/config`,
+thus the AWS region to use needs to be specified as part of the
+Terraform configuration.
+
 #### Create a Single Public Cloud Resource
+
+To create a VPC,
+I write both a Terraform configuration file called
+[vpc.tf](terraform/vpc.tf)
+and a file with variable definitions called
+[01-initial-parameters.tfvars](terraform/01-initial-parameters.tfvars).
+While AWS CloudFormation does not prescribe file extensions,
+Terraform requires `.tf` for configuration files
+and recommends `.tfvars` for variable definition files.
+
+    $ ls
+    01-initial-parameters.tfvars  vpc.tf
+
+I then use `terraform fmt` to format the configuration.
+This commands prints the names of the files that have been changed
+(similar to `go fmt` behavior):
+
+    $ terraform fmt
+    vpc.tf
+
+The first step in deploying a Terraform configuration is to initialize
+the Terraform working directory.
+This step includes downloading the provider binaries for all providers
+used in the configuration.
+In my case the automatic download does not work,
+because of my flakey network connection at home:
+
+    $ terraform init
+    
+    Initializing the backend...
+    
+    Initializing provider plugins...
+    - Checking for available provider plugins...
+    - Downloading plugin for provider "aws" (hashicorp/aws) 2.52.0...
+    
+    Error installing provider "aws": stream error: stream ID 7; PROTOCOL_ERROR.
+    
+    Terraform analyses the configuration and state and automatically downloads
+    plugins for the providers used. However, when attempting to download this
+    plugin an unexpected error occurred.
+    
+    This may be caused if for some reason Terraform is unable to reach the
+    plugin repository. The repository may be unreachable if access is blocked
+    by a firewall.
+    
+    If automatic installation is not possible or desirable in your environment,
+    you may alternatively manually install plugins by downloading a suitable
+    distribution package and placing the plugin's executable file in the
+    following directory:
+        terraform.d/plugins/linux_amd64
+    
+    
+    Error: stream error: stream ID 7; PROTOCOL_ERROR
+
+Thus I manually download the provider binary
+and install it in the subdirectory `terraform.d/plugins/linux_amd64`.
+Afterwards `terraform init` succeeds:
+
+    $ terraform init
+    
+    Initializing the backend...
+    
+    Initializing provider plugins...
+    
+    The following providers do not have any version constraints in configuration,
+    so the latest version was installed.
+    
+    To prevent automatic upgrades to new major versions that may contain breaking
+    changes, it is recommended to add version = "..." constraints to the
+    corresponding provider blocks in configuration, with the constraint strings
+    suggested below.
+    
+    * provider.aws: version = "~> 2.52"
+    
+    Terraform has been successfully initialized!
+    
+    You may now begin working with Terraform. Try running "terraform plan" to see
+    any changes that are required for your infrastructure. All Terraform commands
+    should now work.
+    
+    If you ever set or change modules or backend configuration for Terraform,
+    rerun this command to reinitialize your working directory. If you forget, other
+    commands will detect it and remind you to do so if necessary.
+
+As recommended I fix the provider version number in the configuration file.
+This may or may not result in less problems in the future
+than always using the current provider version.
+*YMMV* ;-)
+
+The command `terraform init` has created a lock file in a hidden directory,
+`.terraform/plugins/linux_amd64/lock.json`:
+
+    $ find .
+    .
+    ./01-initial-parameters.tfvars
+    ./vpc.tf
+    ./.terraform
+    ./.terraform/plugins
+    ./.terraform/plugins/linux_amd64
+    ./.terraform/plugins/linux_amd64/lock.json
+    ./terraform.d
+    ./terraform.d/plugins
+    ./terraform.d/plugins/linux_amd64
+    ./terraform.d/plugins/linux_amd64/terraform-provider-aws_v2.52.0_x4
+
+I do not really like all that,
+so I change the setup a bit.
+Reading the terraform log file in the `/tmp` directory shows
+that the provider binary is searched in the `$PATH` first.
+Thus I move it next to the Terraform binary and remove the `terraform.d`
+directory structure.
+After removing the hidden `.terraform` directory structure, too,
+I re-run `terraform init`.
+It succeeds and creates the hidden directory structure and lock file.
+I add `.terraform/` to my `.gitignore` file.
+The Terraform setup should be good to go now.
+
+The output of `terraform init` suggested running `terraform plan`
+to see what needs to be done to
+implement the configuration.
+I rather validate the configuration first using `terraform validate`:
+
+    $ terraform validate
+    Success! The configuration is valid.
+
+Now I want to see what Terraform plans to do:
+
+    $ terraform plan
+    Refreshing Terraform state in-memory prior to plan...
+    The refreshed state will be used to calculate this plan, but will not be
+    persisted to local or remote state storage.
+    
+    
+    ------------------------------------------------------------------------
+    
+    An execution plan has been generated and is shown below.
+    Resource actions are indicated with the following symbols:
+      + create
+    
+    Terraform will perform the following actions:
+    
+      # aws_vpc.TheVPC will be created
+      + resource "aws_vpc" "TheVPC" {
+          + arn                              = (known after apply)
+          + assign_generated_ipv6_cidr_block = false
+          + cidr_block                       = "10.0.0.0/16"
+          + default_network_acl_id           = (known after apply)
+          + default_route_table_id           = (known after apply)
+          + default_security_group_id        = (known after apply)
+          + dhcp_options_id                  = (known after apply)
+          + enable_classiclink               = (known after apply)
+          + enable_classiclink_dns_support   = (known after apply)
+          + enable_dns_hostnames             = true
+          + enable_dns_support               = true
+          + id                               = (known after apply)
+          + instance_tenancy                 = "default"
+          + ipv6_association_id              = (known after apply)
+          + ipv6_cidr_block                  = (known after apply)
+          + main_route_table_id              = (known after apply)
+          + owner_id                         = (known after apply)
+          + tags                             = {
+              + "Name" = "unnamed"
+            }
+        }
+    
+    Plan: 1 to add, 0 to change, 0 to destroy.
+    
+    ------------------------------------------------------------------------
+    
+    Note: You didn't specify an "-out" parameter to save this plan, so Terraform
+    can't guarantee that exactly these actions will be performed if
+    "terraform apply" is subsequently run.
+
+That is actually *not* what I wanted to do.
+I forgot to specify the parameters for the VPC.
+The command additionally tells me
+that I need to *save* the plan
+to guarantee that the shown plan will be used later
+instead of coming up with a new plan then.
+I will save the plans to a local subdirectory `plans`
+and add the initial parameters:
+
+    $ mkdir plans
+    $ terraform plan --var-file 01-initial-parameters.tfvars -out plans/01-create-vpc.tfplan
+    Refreshing Terraform state in-memory prior to plan...
+    The refreshed state will be used to calculate this plan, but will not be
+    persisted to local or remote state storage.
+    
+    
+    ------------------------------------------------------------------------
+    
+    An execution plan has been generated and is shown below.
+    Resource actions are indicated with the following symbols:
+      + create
+    
+    Terraform will perform the following actions:
+    
+      # aws_vpc.TheVPC will be created
+      + resource "aws_vpc" "TheVPC" {
+          + arn                              = (known after apply)
+          + assign_generated_ipv6_cidr_block = false
+          + cidr_block                       = "10.47.0.0/16"
+          + default_network_acl_id           = (known after apply)
+          + default_route_table_id           = (known after apply)
+          + default_security_group_id        = (known after apply)
+          + dhcp_options_id                  = (known after apply)
+          + enable_classiclink               = (known after apply)
+          + enable_classiclink_dns_support   = (known after apply)
+          + enable_dns_hostnames             = true
+          + enable_dns_support               = true
+          + id                               = (known after apply)
+          + instance_tenancy                 = "default"
+          + ipv6_association_id              = (known after apply)
+          + ipv6_cidr_block                  = (known after apply)
+          + main_route_table_id              = (known after apply)
+          + owner_id                         = (known after apply)
+          + tags                             = {
+              + "Name" = "tf-vpc"
+            }
+        }
+    
+    Plan: 1 to add, 0 to change, 0 to destroy.
+    
+    ------------------------------------------------------------------------
+    
+    This plan was saved to: plans/01-create-vpc.tfplan
+    
+    To perform exactly these actions, run the following command to apply:
+        terraform apply "plans/01-create-vpc.tfplan"
+
+The Terraform plan is a ZIP archive:
+
+    $ file plans/01-create-vpc.tfplan 
+    plans/01-create-vpc.tfplan: Zip archive data, at least v2.0 to extract
+    $ unzip -l plans/01-create-vpc.tfplan
+    Archive:  plans/01-create-vpc.tfplan
+      Length      Date    Time    Name
+    ---------  ---------- -----   ----
+          702  2020-03-08 17:59   tfplan
+          121  2020-03-08 17:59   tfstate
+         1396  2020-03-08 17:59   tfconfig/m-/vpc.tf
+           41  2020-03-08 17:59   tfconfig/modules.json
+    ---------                     -------
+         2260                     4 files
+
+The file `tfplan` is in a binary format and seems to be the actual plan.
+The `tfstate` file is a JSON dictionary,
+the `modules.json` file contains a JSON list of dictionaries,
+and `vpc.tf` is a copy of the configuration file
+without variable substitutions.
+The `tfplan` file contains the values from the variable file.
+
+I do not think this is interesting enough to keep in this repositary,
+so I will delete the `plans/01-create-vpc.tfplan` file after use,
+and just use `terraform apply -vars-file <file>`
+for the remainder of this exercise.
+
+But at first I will execute the generated plan to create a VPC:
+
+    $ terraform apply plans/01-create-vpc.tfplan
+    aws_vpc.TheVPC: Creating...
+    aws_vpc.TheVPC: Creation complete after 7s [id=vpc-02179fb099bcecd94]
+    
+    Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
+    
+    The state of your infrastructure has been saved to the path
+    below. This state is required to modify and destroy your
+    infrastructure, so keep it safe. To inspect the complete state
+    use the `terraform show` command.
+    
+    State path: terraform.tfstate
+    
+    Outputs:
+    
+    Prefix = 10.47.0.0/16
+    VPC_ID = vpc-02179fb099bcecd94
+
+This has (supposedly) created the VPC.
+I check that via AWS CLI:
+
+    $ aws ec2 describe-vpcs --filter Name=isDefault,Values=false
+    -----------------------------------------------------------------------------------------------------------
+    |                                              DescribeVpcs                                               |
+    +---------------------------------------------------------------------------------------------------------+
+    ||                                                 Vpcs                                                  ||
+    |+--------------+----------------+------------------+------------+-------------+-------------------------+|
+    ||   CidrBlock  | DhcpOptionsId  | InstanceTenancy  | IsDefault  |    State    |          VpcId          ||
+    |+--------------+----------------+------------------+------------+-------------+-------------------------+|
+    ||  10.47.0.0/16|  dopt-983cf3f2 |  default         |  False     |  available  |  vpc-02179fb099bcecd94  ||
+    |+--------------+----------------+------------------+------------+-------------+-------------------------+|
+    |||                                       CidrBlockAssociationSet                                       |||
+    ||+---------------------------------------------------------------------+-------------------------------+||
+    |||                            AssociationId                            |           CidrBlock           |||
+    ||+---------------------------------------------------------------------+-------------------------------+||
+    |||  vpc-cidr-assoc-00e1cb09f0438ec4b                                   |  10.47.0.0/16                 |||
+    ||+---------------------------------------------------------------------+-------------------------------+||
+    ||||                                          CidrBlockState                                           ||||
+    |||+--------------------------------------+------------------------------------------------------------+|||
+    ||||  State                               |  associated                                                ||||
+    |||+--------------------------------------+------------------------------------------------------------+|||
+    |||                                                Tags                                                 |||
+    ||+--------------------------------------------+--------------------------------------------------------+||
+    |||                     Key                    |                         Value                          |||
+    ||+--------------------------------------------+--------------------------------------------------------+||
+    |||  Name                                      |  tf-vpc                                                |||
+    ||+--------------------------------------------+--------------------------------------------------------+||
+
+Terraform reports to have written a *state file* called `terraform.tfstate`.
+This is an ASCII file containing JSON data describing the created
+infrastructure.
+The command `terraform show` displays a subset of the state data in HCL format:
+
+    $ terraform show 
+    # aws_vpc.TheVPC:
+    resource "aws_vpc" "TheVPC" {
+        arn                              = "arn:aws:ec2:eu-central-1:143440624024:vpc/vpc-02179fb099bcecd94"
+        assign_generated_ipv6_cidr_block = false
+        cidr_block                       = "10.47.0.0/16"
+        default_network_acl_id           = "acl-08a4cf78e1af64b01"
+        default_route_table_id           = "rtb-0139d83b08199ff24"
+        default_security_group_id        = "sg-022f78b57d2073a13"
+        dhcp_options_id                  = "dopt-983cf3f2"
+        enable_dns_hostnames             = true
+        enable_dns_support               = true
+        id                               = "vpc-02179fb099bcecd94"
+        instance_tenancy                 = "default"
+        main_route_table_id              = "rtb-0139d83b08199ff24"
+        owner_id                         = "143440624024"
+        tags                             = {
+            "Name" = "tf-vpc"
+        }
+    }
+    
+    
+    Outputs:
+    
+    Prefix = "10.47.0.0/16"
+    VPC_ID = "vpc-02179fb099bcecd94"
+
+While it may be interesting to see how the Terraform state changes over time,
+I will omit the state files from version control
+by adding `terraform.tfstate` to `.gitignore`.
 
 #### Change the Created Resource
 
+Next I will change the VPC parameters,
+just as I did with AWS CloudFormation.
+First I will change the name from `tf-vpc` to `Terraform-VPC`,
+then I will change the CIDR prefix from `10.47.0.0/16` to `10.48.0.0/16`.
+Again I expect the name (tag) change to keep the existing VPC,
+but the prefix change requires removing and recreating the VPC.
+Instead of using a plan file,
+I will just use `terraform apply` with the appropriate variable file:
+
+    $ terraform apply -var-file 02-changed-name.tfvars 
+    aws_vpc.TheVPC: Refreshing state... [id=vpc-02179fb099bcecd94]
+    
+    An execution plan has been generated and is shown below.
+    Resource actions are indicated with the following symbols:
+      ~ update in-place
+    
+    Terraform will perform the following actions:
+    
+      # aws_vpc.TheVPC will be updated in-place
+      ~ resource "aws_vpc" "TheVPC" {
+            arn                              = "arn:aws:ec2:eu-central-1:143440624024:vpc/vpc-02179fb099bcecd94"
+            assign_generated_ipv6_cidr_block = false
+            cidr_block                       = "10.47.0.0/16"
+            default_network_acl_id           = "acl-08a4cf78e1af64b01"
+            default_route_table_id           = "rtb-0139d83b08199ff24"
+            default_security_group_id        = "sg-022f78b57d2073a13"
+            dhcp_options_id                  = "dopt-983cf3f2"
+            enable_dns_hostnames             = true
+            enable_dns_support               = true
+            id                               = "vpc-02179fb099bcecd94"
+            instance_tenancy                 = "default"
+            main_route_table_id              = "rtb-0139d83b08199ff24"
+            owner_id                         = "143440624024"
+          ~ tags                             = {
+              ~ "Name" = "tf-vpc" -> "Terraform-VPC"
+            }
+        }
+    
+    Plan: 0 to add, 1 to change, 0 to destroy.
+    
+    Do you want to perform these actions?
+      Terraform will perform the actions described above.
+      Only 'yes' will be accepted to approve.
+    
+      Enter a value: yes
+    
+    aws_vpc.TheVPC: Modifying... [id=vpc-02179fb099bcecd94]
+    aws_vpc.TheVPC: Modifications complete after 7s [id=vpc-02179fb099bcecd94]
+    
+    Apply complete! Resources: 0 added, 1 changed, 0 destroyed.
+    
+    Outputs:
+    
+    Prefix = 10.47.0.0/16
+    VPC_ID = vpc-02179fb099bcecd94
+
+The `terraform show` command displays the changed state:
+
+    $ terraform show
+    # aws_vpc.TheVPC:
+    resource "aws_vpc" "TheVPC" {
+        arn                              = "arn:aws:ec2:eu-central-1:143440624024:vpc/vpc-02179fb099bcecd94"
+        assign_generated_ipv6_cidr_block = false
+        cidr_block                       = "10.47.0.0/16"
+        default_network_acl_id           = "acl-08a4cf78e1af64b01"
+        default_route_table_id           = "rtb-0139d83b08199ff24"
+        default_security_group_id        = "sg-022f78b57d2073a13"
+        dhcp_options_id                  = "dopt-983cf3f2"
+        enable_dns_hostnames             = true
+        enable_dns_support               = true
+        id                               = "vpc-02179fb099bcecd94"
+        instance_tenancy                 = "default"
+        main_route_table_id              = "rtb-0139d83b08199ff24"
+        owner_id                         = "143440624024"
+        tags                             = {
+            "Name" = "Terraform-VPC"
+        }
+    }
+    
+    
+    Outputs:
+    
+    Prefix = "10.47.0.0/16"
+    VPC_ID = "vpc-02179fb099bcecd94"
+
+The VPC tag *Name* has changed,
+but the VPC ID is still the same,
+as can be verified using the AWS CLI:
+
+    $ aws ec2 describe-vpcs --filter Name=isDefault,Values=false
+    -----------------------------------------------------------------------------------------------------------
+    |                                              DescribeVpcs                                               |
+    +---------------------------------------------------------------------------------------------------------+
+    ||                                                 Vpcs                                                  ||
+    |+--------------+----------------+------------------+------------+-------------+-------------------------+|
+    ||   CidrBlock  | DhcpOptionsId  | InstanceTenancy  | IsDefault  |    State    |          VpcId          ||
+    |+--------------+----------------+------------------+------------+-------------+-------------------------+|
+    ||  10.47.0.0/16|  dopt-983cf3f2 |  default         |  False     |  available  |  vpc-02179fb099bcecd94  ||
+    |+--------------+----------------+------------------+------------+-------------+-------------------------+|
+    |||                                       CidrBlockAssociationSet                                       |||
+    ||+---------------------------------------------------------------------+-------------------------------+||
+    |||                            AssociationId                            |           CidrBlock           |||
+    ||+---------------------------------------------------------------------+-------------------------------+||
+    |||  vpc-cidr-assoc-00e1cb09f0438ec4b                                   |  10.47.0.0/16                 |||
+    ||+---------------------------------------------------------------------+-------------------------------+||
+    ||||                                          CidrBlockState                                           ||||
+    |||+--------------------------------------+------------------------------------------------------------+|||
+    ||||  State                               |  associated                                                ||||
+    |||+--------------------------------------+------------------------------------------------------------+|||
+    |||                                                Tags                                                 |||
+    ||+-------------------------------+---------------------------------------------------------------------+||
+    |||              Key              |                                Value                                |||
+    ||+-------------------------------+---------------------------------------------------------------------+||
+    |||  Name                         |  Terraform-VPC                                                      |||
+    ||+-------------------------------+---------------------------------------------------------------------+||
+
+Now to the second part,
+changing the CIDR block:
+
+    $ terraform apply -var-file 03-changed-prefix.tfvars 
+    aws_vpc.TheVPC: Refreshing state... [id=vpc-02179fb099bcecd94]
+    
+    An execution plan has been generated and is shown below.
+    Resource actions are indicated with the following symbols:
+    -/+ destroy and then create replacement
+    
+    Terraform will perform the following actions:
+    
+      # aws_vpc.TheVPC must be replaced
+    -/+ resource "aws_vpc" "TheVPC" {
+          ~ arn                              = "arn:aws:ec2:eu-central-1:143440624024:vpc/vpc-02179fb099bcecd94" -> (known after apply)
+            assign_generated_ipv6_cidr_block = false
+          ~ cidr_block                       = "10.47.0.0/16" -> "10.48.0.0/16" # forces replacement
+          ~ default_network_acl_id           = "acl-08a4cf78e1af64b01" -> (known after apply)
+          ~ default_route_table_id           = "rtb-0139d83b08199ff24" -> (known after apply)
+          ~ default_security_group_id        = "sg-022f78b57d2073a13" -> (known after apply)
+          ~ dhcp_options_id                  = "dopt-983cf3f2" -> (known after apply)
+          + enable_classiclink               = (known after apply)
+          + enable_classiclink_dns_support   = (known after apply)
+            enable_dns_hostnames             = true
+            enable_dns_support               = true
+          ~ id                               = "vpc-02179fb099bcecd94" -> (known after apply)
+            instance_tenancy                 = "default"
+          + ipv6_association_id              = (known after apply)
+          + ipv6_cidr_block                  = (known after apply)
+          ~ main_route_table_id              = "rtb-0139d83b08199ff24" -> (known after apply)
+          ~ owner_id                         = "143440624024" -> (known after apply)
+            tags                             = {
+                "Name" = "Terraform-VPC"
+            }
+        }
+    
+    Plan: 1 to add, 0 to change, 1 to destroy.
+    
+    Do you want to perform these actions?
+      Terraform will perform the actions described above.
+      Only 'yes' will be accepted to approve.
+    
+      Enter a value: yes
+    
+    aws_vpc.TheVPC: Destroying... [id=vpc-02179fb099bcecd94]
+    aws_vpc.TheVPC: Destruction complete after 0s
+    aws_vpc.TheVPC: Creating...
+    aws_vpc.TheVPC: Creation complete after 7s [id=vpc-03f59f91f9c6797a5]
+    
+    Apply complete! Resources: 1 added, 0 changed, 1 destroyed.
+    
+    Outputs:
+    
+    Prefix = 10.48.0.0/16
+    VPC_ID = vpc-03f59f91f9c6797a5
+
+Terraform prominently shows (in red color) that the VPC needs to be
+destroyed and recreated.
+Since Terraform requires confirmation for actually applying a plan,
+unintended actions seem to be avoidable. ☺
+
+The Terraform state has changed again:
+
+    $ terraform show
+    # aws_vpc.TheVPC:
+    resource "aws_vpc" "TheVPC" {
+        arn                              = "arn:aws:ec2:eu-central-1:143440624024:vpc/vpc-03f59f91f9c6797a5"
+        assign_generated_ipv6_cidr_block = false
+        cidr_block                       = "10.48.0.0/16"
+        default_network_acl_id           = "acl-037fb2b755f0f4255"
+        default_route_table_id           = "rtb-0927f8fb0ed8f2e52"
+        default_security_group_id        = "sg-057a32cc9cbf579bf"
+        dhcp_options_id                  = "dopt-983cf3f2"
+        enable_dns_hostnames             = true
+        enable_dns_support               = true
+        id                               = "vpc-03f59f91f9c6797a5"
+        instance_tenancy                 = "default"
+        main_route_table_id              = "rtb-0927f8fb0ed8f2e52"
+        owner_id                         = "143440624024"
+        tags                             = {
+            "Name" = "Terraform-VPC"
+        }
+    }
+    
+    
+    Outputs:
+    
+    Prefix = "10.48.0.0/16"
+    VPC_ID = "vpc-03f59f91f9c6797a5"
+
+The AWS CLI confirms that the intended changes have been performed:
+
+    $ aws ec2 describe-vpcs --filter Name=isDefault,Values=false
+    -----------------------------------------------------------------------------------------------------------
+    |                                              DescribeVpcs                                               |
+    +---------------------------------------------------------------------------------------------------------+
+    ||                                                 Vpcs                                                  ||
+    |+--------------+----------------+------------------+------------+-------------+-------------------------+|
+    ||   CidrBlock  | DhcpOptionsId  | InstanceTenancy  | IsDefault  |    State    |          VpcId          ||
+    |+--------------+----------------+------------------+------------+-------------+-------------------------+|
+    ||  10.48.0.0/16|  dopt-983cf3f2 |  default         |  False     |  available  |  vpc-03f59f91f9c6797a5  ||
+    |+--------------+----------------+------------------+------------+-------------+-------------------------+|
+    |||                                       CidrBlockAssociationSet                                       |||
+    ||+---------------------------------------------------------------------+-------------------------------+||
+    |||                            AssociationId                            |           CidrBlock           |||
+    ||+---------------------------------------------------------------------+-------------------------------+||
+    |||  vpc-cidr-assoc-0d3dec5113edf9c68                                   |  10.48.0.0/16                 |||
+    ||+---------------------------------------------------------------------+-------------------------------+||
+    ||||                                          CidrBlockState                                           ||||
+    |||+--------------------------------------+------------------------------------------------------------+|||
+    ||||  State                               |  associated                                                ||||
+    |||+--------------------------------------+------------------------------------------------------------+|||
+    |||                                                Tags                                                 |||
+    ||+-------------------------------+---------------------------------------------------------------------+||
+    |||              Key              |                                Value                                |||
+    ||+-------------------------------+---------------------------------------------------------------------+||
+    |||  Name                         |  Terraform-VPC                                                      |||
+    ||+-------------------------------+---------------------------------------------------------------------+||
+
+Terraform automatically creates a backup of the current state before
+writing the new one,
+and saves it in the file `terraform.tfstate.backup`.
+This can be used to verify what changed during `terraform apply`:
+
+    $ diff -U0 terraform.tfstate.backup terraform.tfstate
+    --- terraform.tfstate.backup    2020-03-08 18:37:15.327684422 +0100
+    +++ terraform.tfstate   2020-03-08 18:37:22.111875438 +0100
+    @@ -4 +4 @@
+    -  "serial": 4,
+    +  "serial": 7,
+    @@ -8 +8 @@
+    -      "value": "10.47.0.0/16",
+    +      "value": "10.48.0.0/16",
+    @@ -12 +12 @@
+    -      "value": "vpc-02179fb099bcecd94",
+    +      "value": "vpc-03f59f91f9c6797a5",
+    @@ -26 +26 @@
+    -            "arn": "arn:aws:ec2:eu-central-1:143440624024:vpc/vpc-02179fb099bcecd94",
+    +            "arn": "arn:aws:ec2:eu-central-1:143440624024:vpc/vpc-03f59f91f9c6797a5",
+    @@ -28,4 +28,4 @@
+    -            "cidr_block": "10.47.0.0/16",
+    -            "default_network_acl_id": "acl-08a4cf78e1af64b01",
+    -            "default_route_table_id": "rtb-0139d83b08199ff24",
+    -            "default_security_group_id": "sg-022f78b57d2073a13",
+    +            "cidr_block": "10.48.0.0/16",
+    +            "default_network_acl_id": "acl-037fb2b755f0f4255",
+    +            "default_route_table_id": "rtb-0927f8fb0ed8f2e52",
+    +            "default_security_group_id": "sg-057a32cc9cbf579bf",
+    @@ -37 +37 @@
+    -            "id": "vpc-02179fb099bcecd94",
+    +            "id": "vpc-03f59f91f9c6797a5",
+    @@ -41 +41 @@
+    -            "main_route_table_id": "rtb-0139d83b08199ff24",
+    +            "main_route_table_id": "rtb-0927f8fb0ed8f2e52",
+
+I add `terraform.tfstate.backup` to `.gitignore`, too.
+
 #### Remove the Created Resource
+
+To clean up
+the infrastructure can be removed using `terraform destroy`.
+The command again clearly shows what shall happen
+and requires confirmation:
+
+    $ terraform destroy 
+    aws_vpc.TheVPC: Refreshing state... [id=vpc-03f59f91f9c6797a5]
+    
+    An execution plan has been generated and is shown below.
+    Resource actions are indicated with the following symbols:
+      - destroy
+    
+    Terraform will perform the following actions:
+    
+      # aws_vpc.TheVPC will be destroyed
+      - resource "aws_vpc" "TheVPC" {
+          - arn                              = "arn:aws:ec2:eu-central-1:143440624024:vpc/vpc-03f59f91f9c6797a5" -> null
+          - assign_generated_ipv6_cidr_block = false -> null
+          - cidr_block                       = "10.48.0.0/16" -> null
+          - default_network_acl_id           = "acl-037fb2b755f0f4255" -> null
+          - default_route_table_id           = "rtb-0927f8fb0ed8f2e52" -> null
+          - default_security_group_id        = "sg-057a32cc9cbf579bf" -> null
+          - dhcp_options_id                  = "dopt-983cf3f2" -> null
+          - enable_dns_hostnames             = true -> null
+          - enable_dns_support               = true -> null
+          - id                               = "vpc-03f59f91f9c6797a5" -> null
+          - instance_tenancy                 = "default" -> null
+          - main_route_table_id              = "rtb-0927f8fb0ed8f2e52" -> null
+          - owner_id                         = "143440624024" -> null
+          - tags                             = {
+              - "Name" = "Terraform-VPC"
+            } -> null
+        }
+    
+    Plan: 0 to add, 0 to change, 1 to destroy.
+    
+    Do you really want to destroy all resources?
+      Terraform will destroy all your managed infrastructure, as shown above.
+      There is no undo. Only 'yes' will be accepted to confirm.
+    
+      Enter a value: yes
+    
+    aws_vpc.TheVPC: Destroying... [id=vpc-03f59f91f9c6797a5]
+    aws_vpc.TheVPC: Destruction complete after 1s
+    
+    Destroy complete! Resources: 1 destroyed.
+
+The Terraform state is now practically empty:
+
+    $ terraform show
+    
+    $ cat terraform.tfstate
+    {
+      "version": 4,
+      "terraform_version": "0.12.23",
+      "serial": 9,
+      "lineage": "bd54365a-52fb-3335-659b-7b7eeb4729d8",
+      "outputs": {},
+      "resources": []
+    }
+    $ diff -U0 terraform.tfstate.backup terraform.tfstate
+    --- terraform.tfstate.backup    2020-03-08 18:48:20.524418822 +0100
+    +++ terraform.tfstate   2020-03-08 18:48:20.596341300 +0100
+    @@ -4 +4 @@
+    -  "serial": 7,
+    +  "serial": 9,
+    @@ -6,46 +6,2 @@
+    -  "outputs": {
+    -    "Prefix": {
+    -      "value": "10.48.0.0/16",
+    -      "type": "string"
+    -    },
+    -    "VPC_ID": {
+    -      "value": "vpc-03f59f91f9c6797a5",
+    -      "type": "string"
+    -    }
+    -  },
+    -  "resources": [
+    -    {
+    -      "mode": "managed",
+    -      "type": "aws_vpc",
+    -      "name": "TheVPC",
+    -      "provider": "provider.aws",
+    -      "instances": [
+    -        {
+    -          "schema_version": 1,
+    -          "attributes": {
+    -            "arn": "arn:aws:ec2:eu-central-1:143440624024:vpc/vpc-03f59f91f9c6797a5",
+    -            "assign_generated_ipv6_cidr_block": false,
+    -            "cidr_block": "10.48.0.0/16",
+    -            "default_network_acl_id": "acl-037fb2b755f0f4255",
+    -            "default_route_table_id": "rtb-0927f8fb0ed8f2e52",
+    -            "default_security_group_id": "sg-057a32cc9cbf579bf",
+    -            "dhcp_options_id": "dopt-983cf3f2",
+    -            "enable_classiclink": null,
+    -            "enable_classiclink_dns_support": null,
+    -            "enable_dns_hostnames": true,
+    -            "enable_dns_support": true,
+    -            "id": "vpc-03f59f91f9c6797a5",
+    -            "instance_tenancy": "default",
+    -            "ipv6_association_id": "",
+    -            "ipv6_cidr_block": "",
+    -            "main_route_table_id": "rtb-0927f8fb0ed8f2e52",
+    -            "owner_id": "143440624024",
+    -            "tags": {
+    -              "Name": "Terraform-VPC"
+    -            }
+    -          },
+    -          "private": "eyJzY2hlbWFfdmVyc2lvbiI6IjEifQ=="
+    -        }
+    -      ]
+    -    }
+    -  ]
+    +  "outputs": {},
+    +  "resources": []
+
+The *private* instance data is Base64 encoded,
+but not really interesting:
+
+    $ echo eyJzY2hlbWFfdmVyc2lvbiI6IjEifQ== | base64 -d ; echo
+    {"schema_version":"1"}
+
+The AWS CLI confirms that the VPC has been removed
+and only the default VPC remains:
+
+    $ aws ec2 describe-vpcs --filter Name=isDefault,Values=false
+    --------------
+    |DescribeVpcs|
+    +------------+
+    $ aws ec2 describe-vpcs
+    ---------------------------------------------------------------------------------------------------
+    |                                          DescribeVpcs                                           |
+    +-------------------------------------------------------------------------------------------------+
+    ||                                             Vpcs                                              ||
+    |+---------------+----------------+------------------+------------+-------------+----------------+|
+    ||   CidrBlock   | DhcpOptionsId  | InstanceTenancy  | IsDefault  |    State    |     VpcId      ||
+    |+---------------+----------------+------------------+------------+-------------+----------------+|
+    ||  172.31.0.0/16|  dopt-983cf3f2 |  default         |  True      |  available  |  vpc-7f13dc15  ||
+    |+---------------+----------------+------------------+------------+-------------+----------------+|
+    |||                                   CidrBlockAssociationSet                                   |||
+    ||+--------------------------------------------------------+------------------------------------+||
+    |||                      AssociationId                     |             CidrBlock              |||
+    ||+--------------------------------------------------------+------------------------------------+||
+    |||  vpc-cidr-assoc-f576a99e                               |  172.31.0.0/16                     |||
+    ||+--------------------------------------------------------+------------------------------------+||
+    ||||                                      CidrBlockState                                       ||||
+    |||+----------------------------------+--------------------------------------------------------+|||
+    ||||  State                           |  associated                                            ||||
+    |||+----------------------------------+--------------------------------------------------------+|||
+
+I have to say that I liked using Terraform.
+It feels more polished than using AWS CloudFormation via AWS CLI.
+I think I may concentrate on Terraform for the following exercises,
 
 ---
 
