@@ -232,6 +232,11 @@ when using the template,
 the default values specified in the template are used,
 Other VPC properties are hard-coded in the template.
 
+**Update 2020-03-21**: It is not *necessary* to provide a default value
+for a parameter.
+I just did in order to allow to omit providing parameter values while
+testing and learning about CloudFormation.
+
 The template conforms to version *2010-09-09* of template specifications,
 which is the only valid version at the time of writing.
 While it is not necessary to explicitly specify the template version,
@@ -788,6 +793,12 @@ This commands prints the names of the files that have been changed
 
     $ terraform fmt
     vpc.tf
+
+**Update 2020-03-21**: I want to keep the Terraform solution close
+to the CloudFormation one to ease comparison.
+Thus I provide default values for the variables
+although that is not needed
+and will actually result in a mistake later (see below).
 
 The first step in deploying a Terraform configuration is to initialize
 the Terraform working directory.
