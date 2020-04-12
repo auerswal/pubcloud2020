@@ -10,6 +10,12 @@ This repository fulfills a dual purpose:
 1. To submit solutions to the course exercises.
 2. As a reference for me (and potentially others).
 
+My solutions may be longer than strictly necessary.
+I want to really understand what happens,
+and I want to create a reference for me.
+This probably takes more time than just hacking togther a solution,
+but it results in a better learning experience for me.
+
 ## Links to the Exercise Solutions
 
 1. [Define the Requirements](ex1-reqs/) - ruminations on cloud use
