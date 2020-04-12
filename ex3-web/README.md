@@ -182,6 +182,10 @@ Thus I will delete the public SSH key from AWS before continuing:
           "KeyPairs": []
     }
 
+As far as I understand it the default security group used for the default VPC
+does not allow SSH access.
+Thus I expect to need to create a suitable security group as well.
+
 ## 2. Deploy a VM in the default VPC
 
 ### Determining the AMI ID
@@ -200,37 +204,24 @@ to determine the AMI ID to use based on a set of contraints,
 but first I want to take a look at the problem space using the
 [AWS CLI](https://aws.amazon.com/cli/).
 
-I have used many different GNU/Linux distributions in over 25 years
-of personal and professional use,
-starting with the
-[Linux Support Team Erlangen](https://archiveos.org/lst/)
-distribution in the first half of the 1990s.
-The list includes well known distributions like
-[Slackware](http://www.slackware.com/),
-[S.u.S.E.](https://www.suse.com/)
-(now SUSE),
-[Red Hat](https://www.redhat.com/)
-(even before there was a *Red Hat Enterpise Linux* product),
-[Fedora](https://getfedora.org/)
-(both with and without *Core* as part of the name),
-[Debian](https://www.debian.org/),
-and
-[Ubuntu](https://ubuntu.com/).
-It includes less well know distributions too, e.g.,
-[Deutsche Linux Distribution](https://de.wikipedia.org/wiki/Deutsche_Linux-Distribution)
-(DLD, bought by Red Hat), and
-[Mandrake](https://en.wikipedia.org/wiki/Mandriva_Linux)
-which later became Mandriva and then
-[OpenMandriva](https://www.openmandriva.org/).
-I have probably forgotten quite a few distributions I used. ;-)
-Nowadays I primarily use Debian GNU/Linux for servers and
-Ubuntu for notebooks and workstations.
-
-Anyway, I might want to try out
+I want to use either
 [Amazon Linux 2](https://aws.amazon.com/amazon-linux-2/)
-or use
+or
 [Ubuntu](https://ubuntu.com/)
 for this exercise.
+Both supposedly support
+[cloud-init](https://cloud-init.io/).
+I want to use cloud-init to provision the web server.
+Recent cloud-init versions supposedly support
+[Jinja2](http://jinja.pocoo.org/)
+templating.
+I plan on using templating together with
+[AWS instance metadata](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html)
+to render the instance specific HTML page
+for the optional part 7 of the exercise.
+Since I have not yet used cloud-init
+and do not know which version is included in Amazon Linux 2,
+I plan on keeping Ubuntu as a fallback.
 
 The comprehensive
 [AWS documentation](https://docs.aws.amazon.com/)
@@ -265,6 +256,10 @@ implementation in Go.)
 
 The filter values may come in handy when trying to use Terraform's
 [AMI Data Source](https://www.terraform.io/docs/providers/aws/d/ami.html).
+
+### Create a Security Group
+
+### Start an EC2 Instance
 
 ## 3. Create a Public S3 Bucket
 
