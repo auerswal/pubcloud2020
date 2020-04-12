@@ -159,9 +159,15 @@ to a DER encoding:
     $ aws ec2 describe-key-pairs --output text | fgrep PubCloud2020 | cut -f2 | tr -d :
     bcc0badec12da8385d0833badd18dbc4
 
-So in the end uploading (*importing*) the existing OpenSSH key did work.
+So in the end uploading (*importing*) the existing OpenSSH key did work
+correctly.
 I expect to see the OpenSSH fingerprint for the first login to a new instance,
 since I will be using OpenSSH.
+I am not sure how to retrieve the public SSH key from AWS EC2
+to locally compute the OpenSSH fingerprint,
+or how to create the OpenSSH fingerprint in AWS.
+Thus I have no idea how to verify a connection to an EC2 instance
+using an AWS generated SSH key pair.
 
 I want to use a Terraform configuration for this deployment,
 and it seems as if Terraform does support uploading of public SSH keys
@@ -170,7 +176,8 @@ via the
 resource and / or the `terraform import` command.
 (At first glance `terraform import` seems to be an alternative to
 manually creating the resource.)
-Thus I will delete the public SSH key from AWS before continuing:
+Thus I will delete the manually uploaded public SSH key from AWS
+before continuing:
 
     $ aws ec2 delete-key-pair --key-name PubCloud2020
     $ aws ec2 describe-key-pairs
