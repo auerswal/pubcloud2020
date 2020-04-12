@@ -56,7 +56,124 @@ but have not yet implemented an
 [nginx](https://nginx.org/)
 installation.
 
+I expect the solution to be one Terraform configuration.
+I will try to build it step by step,
+but do not yet know how each step will be documented.
+
 ## 1. Create an SSH Key Pair
+
+An SSH key pair is used for (passwordless) command line access to a VM.
+GNU/Linux systems use SSH for remote access from time immemorial,
+and nowadays even
+[Windows systems can provide SSH](https://docs.microsoft.com/en-us/windows-server/administration/openssh/openssh_install_firstuse)
+access.
+
+For AWS, an SSH key pair is an independent cloud resource.
+An EC2 instance can use an SSH key pair.
+Only *RSA* key pairs are supported according to AWS documentation.
+SSH key pairs can be created by AWS,
+or they can created outside of AWS and then imported.
+If a key pair is created outside of AWS,
+AWS cannot know the private half of it.
+Instead of using one of my existing SSH key pairs,
+I create a new one just for this course using `ssh-keygen` from
+[OpenSSH](https://www.openssh.com/):
+
+    $ ssh-keygen -b 4096 -t rsa -f pubcloud2020_rsa_id
+    Generating public/private rsa key pair.
+    Enter passphrase (empty for no passphrase):
+    Enter same passphrase again:
+    Your identification has been saved in pubcloud2020_rsa_id.
+    Your public key has been saved in pubcloud2020_rsa_id.pub.
+    The key fingerprint is:
+    SHA256:xD4sPny4tuxUGnFx39LLcob8s0eNPDETEFCtaLkWP0w auerswald@<redacted>
+    The key's randomart image is:
+    +---[RSA 4096]----+
+    |        . oo++   |
+    |       . o . oo  |
+    |      . +  oo.o. |
+    |       *  =.E++. |
+    |      o S. *+.==.|
+    |     o * .o +=+ o|
+    |      B ..   .oo |
+    |     o.+       o.|
+    |     o=.      .. |
+    +----[SHA256]-----+
+
+This "key pair" can then be imported using the AWS CLI command
+`aws ec2 import-key-pair`.
+This imports only the public key, i.e., half the key pair.
+At first, there are no key pairs:
+
+    $ aws ec2 describe-key-pairs
+    ------------------
+    |DescribeKeyPairs|
+    +----------------+
+
+Then I upload the public key I want to use:
+
+    $ aws ec2 import-key-pair --key-name 'PubCloud2020' --public-key-material file://pubcloud2020_rsa_id.pub
+    ---------------------------------------------------------------------
+    |                           ImportKeyPair                           |
+    +---------------------------------------------------+---------------+
+    |                  KeyFingerprint                   |    KeyName    |
+    +---------------------------------------------------+---------------+
+    |  bc:c0:ba:de:c1:2d:a8:38:5d:08:33:ba:dd:18:db:c4  |  PubCloud2020 |
+    +---------------------------------------------------+---------------+
+
+Now there is an SSH *key pair* available for use with EC2 instances:
+
+    $ aws ec2 describe-key-pairs
+    -----------------------------------------------------------------------
+    |                          DescribeKeyPairs                           |
+    +---------------------------------------------------------------------+
+    ||                             KeyPairs                              ||
+    |+---------------------------------------------------+---------------+|
+    ||                  KeyFingerprint                   |    KeyName    ||
+    |+---------------------------------------------------+---------------+|
+    ||  bc:c0:ba:de:c1:2d:a8:38:5d:08:33:ba:dd:18:db:c4  |  PubCloud2020 ||
+    |+---------------------------------------------------+---------------+|
+
+I am not sure if this has worked correctly,
+because the key fingerprint shown in the AWS CLI output
+does *not* match the fingerprint shown by OpenSSH:
+
+    $ ssh-keygen -l -E md5 -f pubcloud2020_rsa_id.pub
+    4096 MD5:a6:a4:be:a2:7a:b5:bd:74:f6:75:7e:66:22:ad:22:ac auerswald@<redacted> (RSA)
+    $ awk '{print $2}' pubcloud2020_rsa_id.pub | base64 -d | md5sum
+    a6a4bea27ab5bd74f6757e6622ad22ac  -
+
+A quick web search turns up the answer that AWS uses a different key format
+than OpenSSH when calculating the key fingerprint.
+To calculate the AWS fingerprint,
+the key has to converted to the matching format first, i.e.,
+to a DER encoding:
+
+    $ ssh-keygen -e -m PKCS8 -f pubcloud2020_rsa_id.pub | openssl pkey -pubin -pubout -outform DER | md5sum
+    bcc0badec12da8385d0833badd18dbc4  -
+    $ aws ec2 describe-key-pairs --output text | fgrep PubCloud2020 | cut -f2 | tr -d :
+    bcc0badec12da8385d0833badd18dbc4
+
+So in the end uploading (*importing*) the existing OpenSSH key did work.
+I expect to see the OpenSSH fingerprint for the first login to a new instance,
+since I will be using OpenSSH.
+
+I want to use a Terraform configuration for this deployment,
+and it seems as if Terraform does support uploading of public SSH keys
+via the
+[aws\_key\_pair](https://www.terraform.io/docs/providers/aws/r/key_pair.html)
+resource.
+Thus I will delete the public SSH key from AWS before continuing:
+
+    $ aws ec2 delete-key-pair --key-name PubCloud2020
+    $ aws ec2 describe-key-pairs
+    ------------------
+    |DescribeKeyPairs|
+    +----------------+
+    $ aws ec2 describe-key-pairs --output json
+    {
+          "KeyPairs": []
+    }
 
 ## 2. Deploy a VM in the default VPC
 
