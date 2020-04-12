@@ -20,12 +20,12 @@ there misses the point.
 ## Using Amazon Web Services
 
 I will use
-[Amazon web Services](https://aws.amazon.com/)
+[Amazon Web Services](https://aws.amazon.com/)
 (AWS) as with the previous exercises.
 The exercise contains specific objectives for AWS:
 
-1. Create an SSH key pair
-2. Deploy a virtual machine in the default VPC
+1. Create an SSH key pair.
+2. Deploy a virtual machine in the default VPC.
 3. Create a public S3 bucket.
    Upload a picture (JPG or PNG file) of your choice into that bucket.
 4. Turn the S3 bucket into a static web site.
@@ -89,7 +89,7 @@ The list includes well known distributions like
 (even before there was a *Red Hat Enterpise Linux* product),
 [Fedora](https://getfedora.org/)
 (both with and without *Core* as part of the name),
-[Debian](https://www.debian.org/).
+[Debian](https://www.debian.org/),
 and
 [Ubuntu](https://ubuntu.com/).
 It includes less well know distributions too, e.g.,
@@ -113,7 +113,8 @@ The comprehensive
 provides
 [examples](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/finding-an-ami.html#finding-an-ami-aws-cli)
 for finding AMI IDs for, e.g., the latest Amazon Linux 2 or Ubuntu AMIs.
-Currently (2020-04-12) this gives the following result:
+Currently (2020-04-12) this gives the following result for the `eu-central-1`
+region:
 
     $ { aws ec2 describe-images --owners amazon \
     > --filters 'Name=name,Values=amzn2-ami-hvm-2.0.????????.?-x86_64-gp2' \
@@ -135,7 +136,7 @@ Currently (2020-04-12) this gives the following result:
 [`tcat`](https://github.com/auerswal/junkcode/blob/master/tcat)
 above is a small Awk script written by me and available on GitHub.
 It is inspired by Russ Cox's
-[`tcat`](rsc.io/tcat)
+[`tcat`](https://rsc.io/tcat)
 implementation in Go.)
 
 The filter values may come in handy when trying to use Terraform's
