@@ -73,7 +73,8 @@ An EC2 instance can use an SSH key pair.
 Only *RSA* key pairs are supported according to AWS documentation.
 SSH key pairs can be created by AWS,
 or they can created outside of AWS and then imported.
-If a key pair is created outside of AWS,
+If a key pair is created outside of AWS
+and only the public half is uploaded,
 AWS cannot know the private half of it.
 Instead of using one of my existing SSH key pairs,
 I create a new one just for this course using `ssh-keygen` from
@@ -109,6 +110,10 @@ At first, there are no key pairs:
     ------------------
     |DescribeKeyPairs|
     +----------------+
+    $ aws ec2 describe-key-pairs --output json
+    {
+          "KeyPairs": []
+    }
 
 Then I upload the public key I want to use:
 
@@ -121,7 +126,7 @@ Then I upload the public key I want to use:
     |  bc:c0:ba:de:c1:2d:a8:38:5d:08:33:ba:dd:18:db:c4  |  PubCloud2020 |
     +---------------------------------------------------+---------------+
 
-Now there is an SSH *key pair* available for use with EC2 instances:
+Now there is an SSH key pair available for use with EC2 instances:
 
     $ aws ec2 describe-key-pairs
     -----------------------------------------------------------------------
@@ -162,7 +167,9 @@ I want to use a Terraform configuration for this deployment,
 and it seems as if Terraform does support uploading of public SSH keys
 via the
 [aws\_key\_pair](https://www.terraform.io/docs/providers/aws/r/key_pair.html)
-resource.
+resource and / or the `terraform import` command.
+(At first glance `terraform import` seems to be an alternative to
+manually creating the resource.)
 Thus I will delete the public SSH key from AWS before continuing:
 
     $ aws ec2 delete-key-pair --key-name PubCloud2020
