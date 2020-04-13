@@ -298,6 +298,164 @@ but web server packages often include self-signed certificates
 and default TLS access,
 so I will allow both insecure and secure web access.
 
+For reference I will update the default security group to allow access,
+and then remove that again,
+since I want to have the security group settings as part of the Terraform
+configuration.
+
+    $ aws ec2 describe-security-groups --output json
+    {
+        "SecurityGroups": [
+            {
+                "Description": "default VPC security group",
+                "GroupName": "default",
+                "IpPermissions": [
+                    {
+                        "IpProtocol": "-1",
+                        "IpRanges": [],
+                        "Ipv6Ranges": [],
+                        "PrefixListIds": [],
+                        "UserIdGroupPairs": [
+                            {
+                                "GroupId": "sg-805b23e7",
+                                "UserId": "143440624024"
+                            }
+                        ]
+                    }
+                ],
+                "OwnerId": "143440624024",
+                "GroupId": "sg-805b23e7",
+                "IpPermissionsEgress": [
+                    {
+                        "IpProtocol": "-1",
+                        "IpRanges": [
+                            {
+                                "CidrIp": "0.0.0.0/0"
+                            }
+                        ],
+                        "Ipv6Ranges": [],
+                        "PrefixListIds": [],
+                        "UserIdGroupPairs": []
+                    }
+                ],
+                "VpcId": "vpc-7f13dc15"
+            }
+        ]
+    }
+    $ aws ec2 authorize-security-group-ingress --group-name default --ip-permissions '[{"IpProtocol": "tcp", "FromPort": 22, "ToPort": 22, "IpRanges": [{"CidrIp": "0.0.0.0/0", "Description": "SSH access from the Internat"}]}, {"IpProtocol": "tcp", "FromPort": 80, "ToPort": 80, "IpRanges": [{"CidrIp": "0.0.0.0/0", "Description": "HTTP access from the Internat"}]}, {"IpProtocol": "tcp", "FromPort": 443, "ToPort": 443, "IpRanges": [{"CidrIp": "0.0.0.0/0", "Description": "HTTPS access from the Internat"}]}]'
+    $ aws ec2 describe-security-groups --output json
+    {
+        "SecurityGroups": [
+            {
+                "Description": "default VPC security group",
+                "GroupName": "default",
+                "IpPermissions": [
+                    {
+                        "FromPort": 80,
+                        "IpProtocol": "tcp",
+                        "IpRanges": [
+                            {
+                                "CidrIp": "0.0.0.0/0",
+                                "Description": "HTTP access from the Internat"
+                            }
+                        ],
+                        "Ipv6Ranges": [],
+                        "PrefixListIds": [],
+                        "ToPort": 80,
+                        "UserIdGroupPairs": []
+                    },
+                    {
+                        "IpProtocol": "-1",
+                        "IpRanges": [],
+                        "Ipv6Ranges": [],
+                        "PrefixListIds": [],
+                        "UserIdGroupPairs": [
+                            {
+                                "GroupId": "sg-805b23e7",
+                                "UserId": "143440624024"
+                            }
+                        ]
+                    },
+                    {
+                        "FromPort": 22,
+                        "IpProtocol": "tcp",
+                        "IpRanges": [
+                            {
+                                "CidrIp": "0.0.0.0/0",
+                                "Description": "SSH access from the Internat"
+                            }
+                        ],
+                        "Ipv6Ranges": [],
+                        "PrefixListIds": [],
+                        "ToPort": 22,
+                        "UserIdGroupPairs": []
+                    },
+                    {
+                        "FromPort": 443,
+                        "IpProtocol": "tcp",
+                        "IpRanges": [
+                            {
+                                "CidrIp": "0.0.0.0/0",
+                                "Description": "HTTPS access from the Internat"
+                            }
+                        ],
+                        "Ipv6Ranges": [],
+                        "PrefixListIds": [],
+                        "ToPort": 443,
+                        "UserIdGroupPairs": []
+                    }
+                ],
+                "OwnerId": "143440624024",
+                "GroupId": "sg-805b23e7",
+                "IpPermissionsEgress": [
+                    {
+                        "IpProtocol": "-1",
+                        "IpRanges": [
+                            {
+                                "CidrIp": "0.0.0.0/0"
+                            }
+                        ],
+                        "Ipv6Ranges": [],
+                        "PrefixListIds": [],
+                        "UserIdGroupPairs": []
+                    }
+                ],
+                "VpcId": "vpc-7f13dc15"
+            }
+        ]
+    }
+    $ aws ec2 describe-security-groups --output text
+    SECURITYGROUPS  default VPC security group      sg-805b23e7     default 143440624024    vpc-7f13dc15
+    IPPERMISSIONS   80      tcp     80
+    IPRANGES        0.0.0.0/0       HTTP access from the Internat
+    IPPERMISSIONS           -1
+    USERIDGROUPPAIRS        sg-805b23e7     143440624024
+    IPPERMISSIONS   22      tcp     22
+    IPRANGES        0.0.0.0/0       SSH access from the Internat
+    IPPERMISSIONS   443     tcp     443
+    IPRANGES        0.0.0.0/0       HTTPS access from the Internat
+    IPPERMISSIONSEGRESS     -1
+    IPRANGES        0.0.0.0/0
+    $ aws ec2 revoke-security-group-ingress --group-name default --protocol tcp --port 22 --cidr 0.0.0.0/0
+    $ aws ec2 describe-security-groups --output text
+    SECURITYGROUPS  default VPC security group      sg-805b23e7     default 143440624024    vpc-7f13dc15
+    IPPERMISSIONS   80      tcp     80
+    IPRANGES        0.0.0.0/0       HTTP access from the Internat
+    IPPERMISSIONS           -1
+    USERIDGROUPPAIRS        sg-805b23e7     143440624024
+    IPPERMISSIONS   443     tcp     443
+    IPRANGES        0.0.0.0/0       HTTPS access from the Internat
+    IPPERMISSIONSEGRESS     -1
+    IPRANGES        0.0.0.0/0
+    $ aws ec2 revoke-security-group-ingress --group-name default --protocol tcp --port 80 --cidr 0.0.0.0/0
+    $ aws ec2 revoke-security-group-ingress --group-name default --protocol tcp --port 443 --cidr 0.0.0.0/0
+    $ aws ec2 describe-security-groups --output text
+    SECURITYGROUPS  default VPC security group      sg-805b23e7     default 143440624024    vpc-7f13dc15
+    IPPERMISSIONS   -1
+    USERIDGROUPPAIRS        sg-805b23e7     143440624024
+    IPPERMISSIONSEGRESS     -1
+    IPRANGES        0.0.0.0/0
+
 #### Start an EC2 Instance
 
 Instead of starting an EC2 instance now,
