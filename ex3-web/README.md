@@ -161,13 +161,10 @@ to a DER encoding:
 
 So in the end uploading (*importing*) the existing OpenSSH key did work
 correctly.
-I expect to see the OpenSSH fingerprint for the first login to a new instance,
-since I will be using OpenSSH.
-I am not sure how to retrieve the public SSH key from AWS EC2
-to locally compute the OpenSSH fingerprint,
-or how to create the OpenSSH fingerprint in AWS.
-Thus I have no idea how to verify a connection to an EC2 instance
-using an AWS generated SSH key pair.
+
+If you let AWS create a key pair for you,
+all you get is the private key
+and a fingerprint of the public key.
 
 I want to use a Terraform configuration for this deployment,
 and it seems as if Terraform does support uploading of public SSH keys
