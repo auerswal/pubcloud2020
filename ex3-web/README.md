@@ -534,6 +534,10 @@ and then upload the image file to the S3 bucket.
     $ aws s3 cp website/image.png s3://pubcloud2020-website-auerswal/ --acl public-read
     upload: website/image.png to s3://pubcloud2020-website-auerswal/image.png
 
+This S3 bucket is not yet public,
+I will change this later
+when enabling the static website feature.
+
 ### 4. Enable Static Web Site Hosting on the S3 Bucket
 
 An S3 bucket can be used to
