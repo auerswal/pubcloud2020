@@ -209,7 +209,7 @@ or create a suitable security group as well.
 
 ### 2. Deploy a VM in the default VPC
 
-Deploying a virtual machine (VM) respectively EC instance is a preparatory
+Deploying a virtual machine (VM) respectively EC2 instance is a preparatory
 step if the intent is to later configure it,
 either manually,
 or using a configuration management system.
@@ -305,8 +305,9 @@ I will just check that I have all prerequisites ready.
 According to the
 [documentation](https://docs.aws.amazon.com/cli/latest/userguide/cli-services-ec2-instances.html),
 starting (*launching*) an EC2 instance requires:
-* a key pair and
+* a key pair,
 * a security group.
+
 Both have been created respectively updated before.
 
 I no availablity zone is specified,
@@ -323,7 +324,7 @@ since only specific instance types are *free tier eligible*.
 This
 [currently](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/free-tier-limits.html)
 includes the
-*t1.micro*, *t2.micro*', and *t3.micro*
+*t1.micro*, *t2.micro*, and *t3.micro*
 instance types.
 
 Each start of an instance consumes 1h of budget,
@@ -346,7 +347,9 @@ first there needs to be a bucket.
 Then the data can be copied to the bucket.
 File permissions can be set when copying files to S3.
 
-I'll create an image file and an S3 bucket,
+I'll create an
+[image](website/image.png)
+file and an S3 bucket,
 and then upload the image file to the S3 bucket.
 
 #### Creating an Image
@@ -404,7 +407,6 @@ since the default S3 bucket access controls prevent this.
     2020-04-13 16:58:18        644 image.png
     2020-04-13 18:16:12        470 index.html
     $ aws s3 website s3://pubcloud2020-website-auerswal --index-document index.html
-    $
     $ aws s3api get-bucket-website --bucket pubcloud2020-website-auerswal
     ----------------------------
     |     GetBucketWebsite     |
