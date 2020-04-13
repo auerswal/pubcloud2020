@@ -441,7 +441,9 @@ I will cheat and do this via the
 The *Block Public Access* feature is enabled by default on both the account
 and bucket levels.
 It needs to be disabled on both to allow public access.
-After disabling *Block Public Access* a bucket policy that grants public read
+After disabling *Block Public Access* a
+[bucket policy](s3-access-policy.json)
+that grants public read
 access needs to be added.
 Now the S3 hosted static website is accessible:
 
