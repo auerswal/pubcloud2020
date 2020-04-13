@@ -17,7 +17,9 @@ bucket and enabling
 [static website hosting](https://docs.aws.amazon.com/AmazonS3/latest/dev/HostingWebsiteOnS3Setup.html)
 there misses the point.
 
-## Using Amazon Web Services
+## Overview
+
+### Using Amazon Web Services
 
 I will use
 [Amazon Web Services](https://aws.amazon.com/)
@@ -46,21 +48,35 @@ a request when accessing a web site via load balancer.
 
 I intend to use
 [GNU/Linux](https://www.gnu.org/gnu/linux-and-gnu.html),
+either
+[Amazon Linux 2](https://aws.amazon.com/amazon-linux-2/)
+or
+[Ubuntu](https://ubuntu.com/),
 but have not yet decided on which of the two suggested web servers to use.
 I have experience with
 [Apache](https://httpd.apache.org/),
 I have used
 [lighttpd](https://www.lighttpd.net/)
 in a project,
-but have not yet implemented an
+but have not yet done an
 [nginx](https://nginx.org/)
 installation.
+
+For server provisioning I want to use
+[cloud-init](https://cloud-init.io/).
 
 I expect the solution to be one Terraform configuration.
 I will try to build it step by step,
 but do not yet know how each step will be documented.
+I'll probably start with AWS CLI experiments.
 
-## 1. Create an SSH Key Pair
+## Exploring the Problem Space
+
+I want to understand what lies beneath the simple cloud deployment.
+Thus instead of grabbing example code from somewhere,
+I want to look at all the different parts individually first.
+
+### 1. Create an SSH Key Pair
 
 An SSH key pair is used for (passwordless) command line access to a VM.
 GNU/Linux systems use SSH for remote access from time immemorial,
@@ -188,11 +204,19 @@ before continuing:
 
 As far as I understand it the default security group used for the default VPC
 does not allow SSH access.
-Thus I expect to need to create a suitable security group as well.
+Thus I expect to need to either update the default security group,
+or create a suitable security group as well.
 
-## 2. Deploy a VM in the default VPC
+### 2. Deploy a VM in the default VPC
 
-### Determining the AMI ID
+Deploying a virtual machine (VM) respectively EC instance is a preparatory
+step if the intent is to later configure it,
+either manually,
+or using a configuration management system.
+Since I want to use *cloud-init* to combine deployment and provisioning,
+I will not yet start an EC2 instance in this step.
+
+#### Determining the AMI ID
 
 Starting a virtual machine on
 [AWS EC2](https://aws.amazon.com/ec2/)
@@ -261,19 +285,186 @@ implementation in Go.)
 The filter values may come in handy when trying to use Terraform's
 [AMI Data Source](https://www.terraform.io/docs/providers/aws/d/ami.html).
 
-### Create a Security Group
+#### Security Group
 
-### Start an EC2 Instance
+The default security group of the default VPC does not allow any access
+from the Internet.
+We need both SSH and web access for this exercise.
+SSH is needed for troubleshooting
+and possibly provisioning of the web server.
+Web access is needed for the service to be useful.
+I do not intend to set up TLS certificates,
+but web server packages often include self-signed certificates
+and default TLS access,
+so I will allow both insecure and secure web access.
 
-## 3. Create a Public S3 Bucket
+#### Start an EC2 Instance
 
-## 4. Enable Static Web Site Hosting on the S3 Bucket
+Instead of starting an EC2 instance now,
+I will just check that I have all prerequisites ready.
+According to the
+[documentation](https://docs.aws.amazon.com/cli/latest/userguide/cli-services-ec2-instances.html),
+starting (*launching*) an EC2 instance requires:
+* a key pair and
+* a security group.
+Both have been created respectively updated before.
 
-## 5. Install and Enable a Web Server on the VM
+I no availablity zone is specified,
+AWS chooses one.
+The VPC to use is specified via the subnet to use.
+If no subnet is specified,
+one of the default subnets is chosen by AWS.
+If no security group is specified,
+the default security group is used.
 
-## 6. Add a Static Web Page Referencing the S3 Bucket
+Another important thing is to specify the correct *instance type*.
+This is especially important if you want to use the *free tier*,
+since only specific instance types are *free tier eligible*.
+This
+[currently](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/free-tier-limits.html)
+includes the
+*t1.micro*, *t2.micro*', and *t3.micro*
+instance types.
 
-## 7. Add the Web Server's IP to the Web Page
+Each start of an instance consumes 1h of budget,
+thus it may not be advisable to start lots of instances for testing purposes.
+
+### 3. Create a Public S3 Bucket
+
+Amazon S3 is included in the free tier with limits
+that should suffice for the course.
+Using a little bit of storage and accessing it
+should not cost much, if anything,
+so I will set up the S3 hosted static website manually before using Terraform.
+
+[Amazon Simple Storage Service](https://aws.amazon.com/s3/)
+(S3)
+is organized with so called *buckets*.
+Buckets store individual files.
+To store an image in S3,
+first there needs to be a bucket.
+Then the data can be copied to the bucket.
+File permissions can be set when copying files to S3.
+
+I'll create an image file and an S3 bucket,
+and then upload the image file to the S3 bucket.
+
+#### Creating an Image
+
+    $ cat <<EOF | pbmtext | pnmmargin -back 1 | pnmmargin -white 1 | pnmtopng > website/image.png
+    PubCloud 2020
+    Hands-on Exercise 3
+    Image File Stored in AWS S3
+    (C) 2020 Erik Auerswald
+    EOF
+    $ file website/image.png
+    website/image.png: PNG image data, 208 x 94, 1-bit grayscale, non-interlaced
+
+#### Creating an S3 Bucket
+
+    $ aws s3 ls
+    $ aws s3 mb s3://pubcloud2020-website-auerswal
+    make_bucket: pubcloud2020-website-auerswal
+    $ aws s3 ls
+    2020-04-13 16:54:30 pubcloud2020-website-auerswal
+
+#### Copying the Image to the Bucket
+
+    $ aws s3 cp website/image.png s3://pubcloud2020-website-auerswal/ --acl public-read
+    upload: website/image.png to s3://pubcloud2020-website-auerswal/image.png
+
+### 4. Enable Static Web Site Hosting on the S3 Bucket
+
+An S3 bucket can be used to
+[host a static website](https://docs.aws.amazon.com/AmazonS3/latest/dev/WebsiteHosting.html).
+The bucket name will be part of the URL,
+as will be the AWS region.
+The bucket needs to allow public read access.
+All files in the bucket that are part of the website
+need to have read permissions for anyone.
+
+I'll add a simple
+[`index.html`](website/index.html)
+file that references the image to the bucket,
+and use that as the start page.
+
+While the `aws s3` commands provide simple S3 access,
+to control public access to an S3 bucket the
+`aws s3api` commands are used.
+Sadly, the AWS CLI version from Ubuntu 18.04 does not provide the
+`...-public-access-block` subcommands needed for this functionality.
+
+Activating the static website feature of the S3 bucket should not
+result in a publicly accessible website,
+since the default S3 bucket access controls prevent this.
+
+    $ aws s3 cp website/index.html s3://pubcloud2020-website-auerswal/ --acl public-read
+    upload: website/index.html to s3://pubcloud2020-website-auerswal/index.html
+    $ aws s3 ls pubcloud2020-website-auerswal
+    2020-04-13 16:58:18        644 image.png
+    2020-04-13 18:16:12        470 index.html
+    $ aws s3 website s3://pubcloud2020-website-auerswal --index-document index.html
+    $
+    $ aws s3api get-bucket-website --bucket pubcloud2020-website-auerswal
+    ----------------------------
+    |     GetBucketWebsite     |
+    +--------------------------+
+    ||      IndexDocument     ||
+    |+---------+--------------+|
+    ||  Suffix |  index.html  ||
+    |+---------+--------------+|
+
+The website should reside at the URL
+http://pubcloud2020-website-auerswal.s3-website.eu-central-1.amazonaws.com
+according to the AWS CLI help.
+With public access blocked,
+requesting this URL results in a 403 error:
+
+    $ lynx -dump http://pubcloud2020-website-auerswal.s3-website.eu-central-1.amazonaws.com
+                                     403 Forbidden
+    
+         * Code: AccessDenied
+         * Message: Access Denied
+         * RequestId: 4481B7C0844DBE34
+         * HostId:
+           btWaar93FmOYDOGy5d2s1R4gmMNwys4C7ewAw/VdT5wZqta8TaIHnETUcGOfoFk5+PC
+           8Gy21jDY=
+         __________________________________________________________________
+
+Since my AWS CLI version does not provide the needed functionality to enable
+public access to the S3 bucket,
+I will cheat and do this via the
+[AWS Management Console](https://portal.aws.amazon.com/)
+(the web frontend).
+The *Block Public Access* feature is enabled by default on both the account
+and bucket levels.
+It needs to be disabled on both to allow public access.
+After disabling *Block Public Access* a bucket policy that grants public read
+access needs to be added.
+Now the S3 hosted static website is accessible:
+
+    $ lynx -dump http://pubcloud2020-website-auerswal.s3-website.eu-central-1.amazonaws.com
+                     PubCloud 2020 - Exercise 3 - Static S3 Website
+    
+       This website is part of my solution to hands-on exercise 3 of the
+       [1]Networking in Public Cloud Deployments course in the spring of 2020.
+    
+       The exercise requires hosting of an image: PubCloud 2020 Hands-on
+       Exercise 3 Image File Stored in AWS S3 (C) 2020 Erik Auerswald
+    
+    References
+    
+       1. https://www.ipspace.net/PubCloud/
+
+I'll disable public access again for now.
+
+### 5. Install and Enable a Web Server on the VM
+
+### 6. Add a Static Web Page Referencing the S3 Bucket
+
+### 7. Add the Web Server's IP to the Web Page
+
+## Terraform Solution
 
 ---
 
