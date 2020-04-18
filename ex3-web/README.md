@@ -506,20 +506,20 @@ Then the data can be copied to the bucket.
 File permissions can be set when copying files to S3.
 
 I'll create an
-[image](website/image.png)
+[image](s3/image.png)
 file and an S3 bucket,
 and then upload the image file to the S3 bucket.
 
 #### Creating an Image
 
-    $ cat <<EOF | pbmtext | pnmmargin -back 1 | pnmmargin -white 1 | pnmtopng > website/image.png
+    $ cat <<EOF | pbmtext | pnmmargin -back 1 | pnmmargin -white 1 | pnmtopng > s3/image.png
     PubCloud 2020
     Hands-on Exercise 3
     Image File Stored in AWS S3
     (C) 2020 Erik Auerswald
     EOF
-    $ file website/image.png
-    website/image.png: PNG image data, 208 x 94, 1-bit grayscale, non-interlaced
+    $ file s3/image.png
+    s3/image.png: PNG image data, 208 x 94, 1-bit grayscale, non-interlaced
 
 #### Creating an S3 Bucket
 
@@ -531,8 +531,8 @@ and then upload the image file to the S3 bucket.
 
 #### Copying the Image to the Bucket
 
-    $ aws s3 cp website/image.png s3://pubcloud2020-website-auerswal/ --acl public-read
-    upload: website/image.png to s3://pubcloud2020-website-auerswal/image.png
+    $ aws s3 cp s3/image.png s3://pubcloud2020-website-auerswal/ --acl public-read
+    upload: s3/image.png to s3://pubcloud2020-website-auerswal/image.png
 
 This S3 bucket is not yet public,
 I will change this later
@@ -549,7 +549,7 @@ All files in the bucket that are part of the website
 need to have read permissions for anyone.
 
 I'll add a simple
-[`index.html`](website/index.html)
+[`index.html`](s3/index.html)
 file that references the image to the bucket,
 and use that as the start page.
 
@@ -563,8 +563,8 @@ Activating the static website feature of the S3 bucket should not
 result in a publicly accessible website,
 since the default S3 bucket access controls prevent this.
 
-    $ aws s3 cp website/index.html s3://pubcloud2020-website-auerswal/ --acl public-read
-    upload: website/index.html to s3://pubcloud2020-website-auerswal/index.html
+    $ aws s3 cp s3/index.html s3://pubcloud2020-website-auerswal/ --acl public-read
+    upload: s3/index.html to s3://pubcloud2020-website-auerswal/index.html
     $ aws s3 ls pubcloud2020-website-auerswal
     2020-04-13 16:58:18        644 image.png
     2020-04-13 18:16:12        470 index.html
@@ -623,12 +623,162 @@ Now the S3 hosted static website is accessible:
        1. https://www.ipspace.net/PubCloud/
 
 I'll disable public access again for now.
+Since I want to use Terraform,
+I'll delete the manually created bucket:
+
+    $ aws s3 ls
+    2020-04-13 19:05:20 pubcloud2020-website-auerswal
+    $ aws s3 ls s3://pubcloud2020-website-auerswal
+    2020-04-13 16:58:18        644 image.png
+    2020-04-13 18:55:40        547 index.html
+    $ aws s3 rb s3://pubcloud2020-website-auerswal --force
+    delete: s3://pubcloud2020-website-auerswal/index.html
+    delete: s3://pubcloud2020-website-auerswal/image.png
+    remove_bucket: pubcloud2020-website-auerswal
+    $ aws s3 ls
+    $
 
 ### 5. Install and Enable a Web Server on the VM
 
+I want to use
+[cloud-init](https://cloud-init.io/)
+for server provisioning.
+This includes installing package updates
+(on Debian or Ubuntu that would basically mean `apt update` and `apt upgrade`),
+installing the specific package(s) needed for the service
+(`apt install apache2`),
+and applying the specific service configuration,
+e.g., installing the correct `/var/www/index.html` file.
+
+On Debian and Ubuntu, installed services are started automatically
+(sometimes there is a file in `/etc/defaults` that allows disabling
+or even requires enabling of a service,
+but that is service specific),
+Red Hat and derivatives usually require *enabling* of installed services.
+Thus Amazon Linux 2 might require this extra step, too.
+
+According to the
+[cloud-init documentation](https://cloudinit.readthedocs.io/)
+this should be possible with a *cloud-config* file
+provided to the EC2 instance via *user-data*.
+For installation of Apache this could look as follows:
+
+    #cloud-config
+    package_update: true
+    package_upgrade: true
+    packages:
+      - apache2
+    # /var/www/index.html creation missing
+
 ### 6. Add a Static Web Page Referencing the S3 Bucket
 
+Providing the `index.html` file might be possible with one of two approaches:
+
+1. Use the `write_files:` directive to create `/var/www/index.html`
+2. Use the `runcmd:` directive with `echo`, `printf`, or `cat`
+
+#### 1. Using `write_files:`
+
+I would prefer the first method,
+but do not know if it works.
+This depends on the execution order of package installation and file creation.
+The `apache` package of Debian or Ubuntu installs a default start page,
+and I think this is `/var/www/index.html`.
+The `/var/www/` directory is created by the `apache2` package,
+I do not know if cloud-init automatically creates the path to the file
+that is written with `write_files:`.
+Sufficiently current versions of cloud-init support Jinja2 templating.
+This needs to be activated for the cloud-config file.
+This could be used for the optional part of the exercise,
+i.e., to add IP address information to the web page.
+Relevant instance metadata might include:
+
+* v1.local\_hostname
+* v1.region
+* v1.availability\_zone
+* ds.meta\_data.local\_ipv4
+
+This could look as follows:
+
+    ## template: jinja
+    #cloud-config
+    package_update: true
+    package_upgrade: true
+    packages:
+      - apache2
+    write_files:
+      - path: /var/www/index.html
+      - owner: 'root:root'
+      - permissions: '0644'
+      - content: |
+          <html>
+          <head>
+           <title>PubCloud 2020 - Exercise 3 - Static EC2 Website</title>
+          </head>
+          <body>
+           <h1>PubCloud 2020 - Exercise 3 - Static EC2 Website</h1>
+           <p>This website is part of my solution to hands-on exercise 3
+              of the <a href="https://www.ipspace.net/PubCloud/">Networking
+              in Public Cloud Deployments</a> course in the spring of 2020.</p>
+           <p>The following image is hosted as a static website on S3:</p>
+           <p><img src="image.png" alt="image stored in S3 bucket"></p>
+           <p>This request was served from host {{v1.local_hostname}} with
+              local IP address {{ds.meta_data.local_ipv4}} in availability
+              zone {{v1.availability_zone}} of region {{v1.region}},
+              </p>
+          </body>
+          </html>
+
+#### 2. Using `runcmd:`
+
+I have seen a cloud-init screencast that used `runcmd:` to generate
+the Apache `index.html` file,
+so the second method should work.
+The `runcmd:` method could include output from iproute2
+for the optional part of this exercise,
+but instead I'd first try to use instance metadata.
+A cloud-config file could look as follows:
+
+    ## template: jinja
+    #cloud-config
+    package_update: true
+    package_upgrade: true
+    packages:
+      - apache2
+    runcmd:
+      - |
+        cat <<EOF >/var/www/index.html
+        <html>
+        <head>
+         <title>PubCloud 2020 - Exercise 3 - Static EC2 Website</title>
+        </head>
+        <body>
+         <h1>PubCloud 2020 - Exercise 3 - Static EC2 Website</h1>
+         <p>This website is part of my solution to hands-on exercise 3
+            of the <a href="https://www.ipspace.net/PubCloud/">Networking
+            in Public Cloud Deployments</a> course in the spring of 2020.</p>
+         <p>The following image is hosted as a static website on S3:</p>
+         <p><img src="image.png" alt="image stored in S3 bucket"></p>
+         <p>This request was served from host {{v1.local_hostname}} with
+            local IP address {{ds.meta_data.local_ipv4}} in availability
+            zone {{v1.availability_zone}} of region {{v1.region}},
+            </p>
+        </body>
+        </html>
+        EOF
+
 ### 7. Add the Web Server's IP to the Web Page
+
+Adding the server's IP address is already part of the above cloud-config
+examples.
+
+The above cloud-configs have been written from looking at documentation
+and small examples.
+I do not know if they actually work,
+but they illustrate what I will try do.
+
+The following section will describe a Terraform configuration
+that implements the solution.
 
 ## Terraform Solution
 
