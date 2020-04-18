@@ -721,7 +721,7 @@ This could look as follows:
               of the <a href="https://www.ipspace.net/PubCloud/">Networking
               in Public Cloud Deployments</a> course in the spring of 2020.</p>
            <p>The following image is hosted as a static website on S3:</p>
-           <p><img src="image.png" alt="image stored in S3 bucket"></p>
+           <p><img src="http://pubcloud2020-website-auerswal.s3-website.eu-central-1.amazonaws.com/image.png" alt="image stored in S3 bucket"></p>
            <p>This request was served from host {{v1.local_hostname}} with
               local IP address {{ds.meta_data.local_ipv4}} in availability
               zone {{v1.availability_zone}} of region {{v1.region}},
@@ -758,7 +758,7 @@ A cloud-config file could look as follows:
             of the <a href="https://www.ipspace.net/PubCloud/">Networking
             in Public Cloud Deployments</a> course in the spring of 2020.</p>
          <p>The following image is hosted as a static website on S3:</p>
-         <p><img src="image.png" alt="image stored in S3 bucket"></p>
+         <p><img src="http://pubcloud2020-website-auerswal.s3-website.eu-central-1.amazonaws.com/image.png" alt="image stored in S3 bucket"></p>
          <p>This request was served from host {{v1.local_hostname}} with
             local IP address {{ds.meta_data.local_ipv4}} in availability
             zone {{v1.availability_zone}} of region {{v1.region}},
