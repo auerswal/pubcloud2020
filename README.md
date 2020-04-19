@@ -21,6 +21,9 @@ but it results in a better learning experience for me.
 1. [Define the Requirements](ex1-reqs/) - ruminations on cloud use
 2. [Simple Infrastructure-as-Code Setup](ex2-iac/) - looking at AWS,
    AWS CloudFormation, and Terraform
+3. [Deploy a Cloud-Based Web Server](ex3-web/) - all of SSH, Security Groups,
+   EC2, Cloud-Init, S3, and S3 static web site hosting in a single Terraform
+   configuration
 
 ---
 
