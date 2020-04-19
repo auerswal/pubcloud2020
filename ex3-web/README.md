@@ -78,7 +78,7 @@ I want to look at all the different parts individually first.
 
 If you do not want to read about all the tedious details,
 you can skip ahead to the
-[Terraform section](#terraform-solution)
+[Terraform section](ex3-web#terraform-solution).
 
 ### 1. Create an SSH Key Pair
 
