@@ -654,7 +654,7 @@ This includes installing package updates
 installing the specific package(s) needed for the service
 (`apt install apache2`),
 and applying the specific service configuration,
-e.g., installing the correct `/var/www/index.html` file.
+e.g., installing the correct `/var/www/html/index.html` file.
 
 On Debian and Ubuntu, installed services are started automatically
 (sometimes there is a file in `/etc/defaults` that allows disabling
@@ -674,13 +674,13 @@ For installation of Apache this could look as follows:
     package_upgrade: true
     packages:
       - apache2
-    # /var/www/index.html creation missing
+    # /var/www/html/index.html creation missing
 
 ### 6. Add a Static Web Page Referencing the S3 Bucket
 
 Providing the `index.html` file might be possible with one of two approaches:
 
-1. Use the `write_files:` directive to create `/var/www/index.html`
+1. Use the `write_files:` directive to create `/var/www/html/index.html`
 2. Use the `runcmd:` directive with `echo`, `printf`, or `cat`
 
 #### 1. Using `write_files:`
@@ -689,8 +689,8 @@ I would prefer the first method,
 but do not know if it works.
 This depends on the execution order of package installation and file creation.
 The `apache` package of Debian or Ubuntu installs a default start page,
-and I think this is `/var/www/index.html`.
-The `/var/www/` directory is created by the `apache2` package,
+and I think this is `/var/www/html/index.html`.
+The `/var/www/html/` directory is created by the `apache2` package,
 I do not know if cloud-init automatically creates the path to the file
 that is written with `write_files:`.
 Sufficiently current versions of cloud-init support Jinja2 templating.
@@ -713,7 +713,7 @@ This could look as follows:
     packages:
       - apache2
     write_files:
-      - path: /var/www/index.html
+      - path: /var/www/html/index.html
         owner: 'root:root'
         permissions: '0644'
         content: |
