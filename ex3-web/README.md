@@ -76,6 +76,10 @@ I want to understand what lies beneath the simple cloud deployment.
 Thus instead of grabbing example code from somewhere,
 I want to look at all the different parts individually first.
 
+If you do not want to read about all the tedious details,
+you can skip ahead to the
+[Terraform section](#terraform-solution)
+
 ### 1. Create an SSH Key Pair
 
 An SSH key pair is used for (passwordless) command line access to a VM.
