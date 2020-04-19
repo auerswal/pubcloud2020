@@ -1729,6 +1729,22 @@ The other resources are no longer shown at all.
 That's all for now,
 I won't try out Amazon Linux 2, nginx, or the `runcmd:` cloud-init method yet.
 
+After some time, the instances are gone for good:
+
+    $ aws ec2 describe-instances
+    -------------------
+    |DescribeInstances|
+    +-----------------+
+
+*To stay honest, I have changed the Terraform output to show just the
+complete DNS name of the S3 static website.
+Again, the Terraform documentation,
+while comprehensive,
+still shows optimization potential.
+I did not care for the `website_domain`,
+but rather for the `website_endpoint`.
+Thus I removed the `website_domain` from the Terraform configuration outputs.*
+
 ---
 
 [PubCloud2020 GitHub repository](https://github.com/auerswal/pubcloud2020) |
