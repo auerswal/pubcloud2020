@@ -503,6 +503,8 @@ so I will set up the S3 hosted static website manually before using Terraform.
 [Amazon Simple Storage Service](https://aws.amazon.com/s3/)
 (S3)
 is organized with so called *buckets*.
+Amazon S3 buckets have the peculiar characteristic that their names must
+be globally unique.
 Buckets store individual files.
 To store an image in S3,
 first there needs to be a bucket.
@@ -712,9 +714,9 @@ This could look as follows:
       - apache2
     write_files:
       - path: /var/www/index.html
-      - owner: 'root:root'
-      - permissions: '0644'
-      - content: |
+        owner: 'root:root'
+        permissions: '0644'
+        content: |
           <html>
           <head>
            <title>PubCloud 2020 - Exercise 3 - Static EC2 Website</title>
@@ -752,7 +754,7 @@ A cloud-config file could look as follows:
       - apache2
     runcmd:
       - |
-        cat <<EOF >/var/www/index.html
+        cat <<EOF >/var/www/html/index.html
         <html>
         <head>
          <title>PubCloud 2020 - Exercise 3 - Static EC2 Website</title>
@@ -787,6 +789,945 @@ The following section will describe a Terraform configuration
 that implements the solution.
 
 ## Terraform Solution
+
+I want to create a
+[Terraform](https://www.terraform.io/)
+configuration for the web server deployment.
+
+### Avoiding the Default Security Group
+
+This configuration needs to comprise all used components,
+including VPC and Security Group (SG).
+The exercise specifies to use the default VPC,
+but does not prescribe which Subnet or Security Group to use.
+Since Terraform
+[does not restore](https://www.terraform.io/docs/providers/aws/r/default_security_group.html#removing-aws_default_security_group-from-your-configuration)
+the Default Security Group when destroying the deployment,
+I will create a new Security Group for the web server.
+
+### The Terraform Configuration
+
+The Terraform configuration for the web server deployment can be found
+in the
+[web\_server.tf](terraform/web_server.tf)
+file.
+I will check in and show the final version only.
+
+I use the same version of the Terraform AWS provider as in the
+[previous](../ex2-iac/)
+hands-on exercise.
+
+I use variable definitions to select the GNU/Linux flavor:
+the file
+[ubuntu.tfvars](terraform/ubuntu.tfvars)
+selects the latest Ubuntu 18.04 LTS image,
+the file
+[amazon\_linux\_2.tfvars](terraform/amazon_linux_2.tfvars)
+selects the latest Amazon Linux 2 image.
+The variables are used for the *aws_ami* data source
+that selects the Amazon Machine Image (AMI) to use for the web server.
+
+The web server shall be deployed in the default VPC.
+Thus the default VPC is added as a data source.
+This data source is used to add the new Security Group to the default VPC.
+
+The public SSH key for EC2 instance access is added as a resource,
+reading the actual public key from the file system using Terraform's
+*file()* function.
+
+The per account *S3 Public Access Block* is added as a resource.
+I do not really understand the pertaining Terraform
+[documentation](https://www.terraform.io/docs/providers/aws/r/s3_account_public_access_block.html),
+thus I will probably need to apply a *trial and error* methodology.
+According to the documentation every blocking action of this resource
+defaults to *false*,
+and I just want to disable the block,
+thus I assume that I do not need to configure anything,
+just define this resource.
+
+The the S3 bucket is added as a resource.
+The static website functionality for the bucket is enabled in this resource.
+The two files needed for the S3 static website are added via
+*aws_s3_bucket_object* resources.
+The *etag* argument allows Terraform to detect changes of the local files.
+
+Since I do not want to change the default SG via Terraform,
+I add a new one just for the web server.
+This SG is attached to the default VPC,
+referenced via Terraform *data source*,
+since I do not want to change the default VPC itself.
+The SG replicates adding SSH and HTTP(S) access to the default SG.
+
+The final resource is the web server EC2 instance.
+I have added manual dependencies on the S3 bucket and its contents,
+since the website references the image stored in the S3 bucket,
+but Terraform cannot determine this itself.
+The *cloud-config* for *cloud-init* is read from the file
+[web\_server.cloud-config](terraform/web_server.cloud-config)
+and provided as *user_data*.
+
+I want to have the web server's public DNS name and public IP address
+as outputs.
+Additionally, I want to have S3 website information as outputs.
+
+### Invoking Terraform
+
+At first, the Terraform working directory needs to be initialized
+using `terraform init`:
+
+    $ terraform init
+    
+    Initializing the backend...
+    
+    Initializing provider plugins...
+    
+    Terraform has been successfully initialized!
+    
+    You may now begin working with Terraform. Try running "terraform plan" to see
+    any changes that are required for your infrastructure. All Terraform commands
+    should now work.
+    
+    If you ever set or change modules or backend configuration for Terraform,
+    rerun this command to reinitialize your working directory. If you forget, other
+    commands will detect it and remind you to do so if necessary.
+
+Then I update the formatting of the HCL configuration file using
+`terraform fmt`:
+
+    $ terraform fmt
+    amazon_linux_2.tfvars
+    ubuntu.tfvars
+    web_server.tf
+
+I then use `terraform validate` to check mys configuration.
+After fixing a couple of mistakes
+and re-running `terraform fmt`
+the configuration is accepted:
+
+    $ terraform validate
+    
+    Error: Unsupported block type
+    [...further output omitted]
+    $ vi web_server.tf
+    $ terraform fmt
+    web_server.tf
+    $ terraform validate
+    Success! The configuration is valid.
+
+Now I feel sufficiently confident to try and instantiate the Terraform
+configuration using `terraform apply`.
+Terraform will show what it intends to do,
+and requires confirmation,
+so I can still abort if I do not like what I see.
+
+The initial configuration did not work.
+I did not set the content type for the S3 objects,
+so the web server returned them as `binary/octet-stream`.
+As a result web browsers did not show them as web page and image,
+but provided them as downloads.
+Additionally, I wrote the index document to the wrong path,
+and used a faulty `write_files:` directive,
+which resulted in an empty file.
+I have corercted those problems above as well,
+because I want to use this page as a reference.
+
+So after troubleshooting I use `terraform destroy`
+to clean up.
+I then fix the configuration and try again:
+
+```
+$ terraform validate
+Success! The configuration is valid.
+
+$ terraform apply --var-file ubuntu.tfvars 
+data.aws_vpc.default: Refreshing state...
+data.aws_ami.gnu_linux_image: Refreshing state...
+
+An execution plan has been generated and is shown below.
+Resource actions are indicated with the following symbols:
+  + create
+
+Terraform will perform the following actions:
+
+  # aws_instance.ec2_web will be created
+  + resource "aws_instance" "ec2_web" {
+      + ami                          = "ami-0e342d72b12109f91"
+      + arn                          = (known after apply)
+      + associate_public_ip_address  = true
+      + availability_zone            = (known after apply)
+      + cpu_core_count               = (known after apply)
+      + cpu_threads_per_core         = (known after apply)
+      + get_password_data            = false
+      + host_id                      = (known after apply)
+      + id                           = (known after apply)
+      + instance_state               = (known after apply)
+      + instance_type                = "t2.micro"
+      + ipv6_address_count           = (known after apply)
+      + ipv6_addresses               = (known after apply)
+      + key_name                     = (known after apply)
+      + network_interface_id         = (known after apply)
+      + password_data                = (known after apply)
+      + placement_group              = (known after apply)
+      + primary_network_interface_id = (known after apply)
+      + private_dns                  = (known after apply)
+      + private_ip                   = (known after apply)
+      + public_dns                   = (known after apply)
+      + public_ip                    = (known after apply)
+      + security_groups              = (known after apply)
+      + source_dest_check            = true
+      + subnet_id                    = (known after apply)
+      + tags                         = {
+          + "Name" = "Web_Server_EC2_Instance"
+        }
+      + tenancy                      = (known after apply)
+      + user_data                    = "455b1285756944477f035f285dceb37708d98635"
+      + volume_tags                  = (known after apply)
+      + vpc_security_group_ids       = (known after apply)
+
+      + ebs_block_device {
+          + delete_on_termination = (known after apply)
+          + device_name           = (known after apply)
+          + encrypted             = (known after apply)
+          + iops                  = (known after apply)
+          + kms_key_id            = (known after apply)
+          + snapshot_id           = (known after apply)
+          + volume_id             = (known after apply)
+          + volume_size           = (known after apply)
+          + volume_type           = (known after apply)
+        }
+
+      + ephemeral_block_device {
+          + device_name  = (known after apply)
+          + no_device    = (known after apply)
+          + virtual_name = (known after apply)
+        }
+
+      + network_interface {
+          + delete_on_termination = (known after apply)
+          + device_index          = (known after apply)
+          + network_interface_id  = (known after apply)
+        }
+
+      + root_block_device {
+          + delete_on_termination = (known after apply)
+          + encrypted             = (known after apply)
+          + iops                  = (known after apply)
+          + kms_key_id            = (known after apply)
+          + volume_id             = (known after apply)
+          + volume_size           = (known after apply)
+          + volume_type           = (known after apply)
+        }
+    }
+
+  # aws_key_pair.course_ssh_key will be created
+  + resource "aws_key_pair" "course_ssh_key" {
+      + fingerprint = (known after apply)
+      + id          = (known after apply)
+      + key_name    = "tf-pubcloud2020"
+      + key_pair_id = (known after apply)
+      + public_key  = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDDiXuVGxn6zqLCPKbcojNC813FAnOPBWToBz/XTQaMzMsoAeKMRwVrUoyHEVj8UTFiuEUbTz/0jHItv5ZmFXI1DNY1m+hXxCDVcBp8ojCutX3+AJ012qG2PIZaloaYCjrTkhHj9VmMHAl1jzJ0EbPsoU/Qc4pZCNUNaCVCkG6EHisOUy9wx20i4gA/nrDnjIxk9TD2mGdlVCK7SESH/vGWgMtU6fLI65trtC4eojPNNUyMq8tTLyJxoTdYEwMY5alKkcjjw6+yVBOrtYgZSlMW02WLTkJT7eCxwVHig8a+bywiwAxuvYlUgfmOHEGEIXXTGk/+KNiLrDXdmkK4kuUvlf6rD7qR/kedqQAt0k5v/PiW3ufpej7n1ZBZroSsBT/0Yp5UcCLxpzskUYu+TRLRp+6gI50KsNe/oT8tesNtOVTK2ePD4eXApXAYwQpXy1389c4gGgh4wWljmHyeoFjcd4Soq847/PNspRdswR/u5jyswTsCROKsCJ4+whJRme8JoqaZHGBTpTu9n6gaZJVXbFM/55RYh0bpuCD5BHrdk0+HX4BmhJ1KqdDTDR84y2riwlpv6Eiw8AX8N2GVLOpP6RMt/AUCNUEy5nPWJosKb+UQE/j1dRJ9iorm2EGbh30dv/nRCb2Cu7BVyNWbmSrVaKdJub28SfV5L51sd+ATBw== auerswald@short"
+    }
+
+  # aws_s3_account_public_access_block.s3_pab will be created
+  + resource "aws_s3_account_public_access_block" "s3_pab" {
+      + account_id              = (known after apply)
+      + block_public_acls       = false
+      + block_public_policy     = false
+      + id                      = (known after apply)
+      + ignore_public_acls      = false
+      + restrict_public_buckets = false
+    }
+
+  # aws_s3_bucket.s3_image will be created
+  + resource "aws_s3_bucket" "s3_image" {
+      + acceleration_status         = (known after apply)
+      + acl                         = "public-read"
+      + arn                         = (known after apply)
+      + bucket                      = "pubcloud2020-ex3-website-auerswal"
+      + bucket_domain_name          = (known after apply)
+      + bucket_regional_domain_name = (known after apply)
+      + force_destroy               = false
+      + hosted_zone_id              = (known after apply)
+      + id                          = (known after apply)
+      + policy                      = jsonencode(
+            {
+              + Statement = [
+                  + {
+                      + Action    = "s3:GetObject"
+                      + Effect    = "Allow"
+                      + Principal = "*"
+                      + Resource  = "arn:aws:s3:::pubcloud2020-ex3-website-auerswal/*"
+                      + Sid       = "PublicReadGetObject"
+                    },
+                ]
+              + Version   = "2012-10-17"
+            }
+        )
+      + region                      = (known after apply)
+      + request_payer               = (known after apply)
+      + tags                        = {
+          + "Name" = "S3_bucket_for_image"
+        }
+      + website_domain              = (known after apply)
+      + website_endpoint            = (known after apply)
+
+      + versioning {
+          + enabled    = (known after apply)
+          + mfa_delete = (known after apply)
+        }
+
+      + website {
+          + index_document = "index.html"
+        }
+    }
+
+  # aws_s3_bucket_object.image will be created
+  + resource "aws_s3_bucket_object" "image" {
+      + acl                    = "public-read"
+      + bucket                 = (known after apply)
+      + content_type           = "image/png"
+      + etag                   = "fcee1e0ebd394059c359e15bbd2b566e"
+      + force_destroy          = false
+      + id                     = (known after apply)
+      + key                    = "image.png"
+      + server_side_encryption = (known after apply)
+      + source                 = "../s3/image.png"
+      + storage_class          = (known after apply)
+      + version_id             = (known after apply)
+    }
+
+  # aws_s3_bucket_object.index will be created
+  + resource "aws_s3_bucket_object" "index" {
+      + acl                    = "public-read"
+      + bucket                 = (known after apply)
+      + content_type           = "text/html"
+      + etag                   = "fedc37a095b63326f321a4b0562a44af"
+      + force_destroy          = false
+      + id                     = (known after apply)
+      + key                    = "index.html"
+      + server_side_encryption = (known after apply)
+      + source                 = "../s3/index.html"
+      + storage_class          = (known after apply)
+      + version_id             = (known after apply)
+    }
+
+  # aws_security_group.sg_web will be created
+  + resource "aws_security_group" "sg_web" {
+      + arn                    = (known after apply)
+      + description            = "Allow HTTP(S) and SSH access to web server"
+      + egress                 = [
+          + {
+              + cidr_blocks      = [
+                  + "0.0.0.0/0",
+                ]
+              + description      = "Allow Internet access for, e.g., updates"
+              + from_port        = 0
+              + ipv6_cidr_blocks = []
+              + prefix_list_ids  = []
+              + protocol         = "-1"
+              + security_groups  = []
+              + self             = false
+              + to_port          = 0
+            },
+        ]
+      + id                     = (known after apply)
+      + ingress                = [
+          + {
+              + cidr_blocks      = [
+                  + "0.0.0.0/0",
+                ]
+              + description      = "Allow HTTP from the Internet"
+              + from_port        = 80
+              + ipv6_cidr_blocks = []
+              + prefix_list_ids  = []
+              + protocol         = "tcp"
+              + security_groups  = []
+              + self             = false
+              + to_port          = 80
+            },
+          + {
+              + cidr_blocks      = [
+                  + "0.0.0.0/0",
+                ]
+              + description      = "Allow HTTPS from the Internet"
+              + from_port        = 443
+              + ipv6_cidr_blocks = []
+              + prefix_list_ids  = []
+              + protocol         = "tcp"
+              + security_groups  = []
+              + self             = false
+              + to_port          = 443
+            },
+          + {
+              + cidr_blocks      = [
+                  + "0.0.0.0/0",
+                ]
+              + description      = "Allow SSH from the Internet"
+              + from_port        = 22
+              + ipv6_cidr_blocks = []
+              + prefix_list_ids  = []
+              + protocol         = "tcp"
+              + security_groups  = []
+              + self             = false
+              + to_port          = 22
+            },
+          + {
+              + cidr_blocks      = []
+              + description      = "Allow everything inside the SG"
+              + from_port        = 0
+              + ipv6_cidr_blocks = []
+              + prefix_list_ids  = []
+              + protocol         = "-1"
+              + security_groups  = []
+              + self             = true
+              + to_port          = 0
+            },
+        ]
+      + name                   = "tf-sg-web"
+      + owner_id               = (known after apply)
+      + revoke_rules_on_delete = false
+      + tags                   = {
+          + "Name" = "Web_Server_Security_Group"
+        }
+      + vpc_id                 = "vpc-7f13dc15"
+    }
+
+Plan: 7 to add, 0 to change, 0 to destroy.
+
+Do you want to perform these actions?
+  Terraform will perform the actions described above.
+  Only 'yes' will be accepted to approve.
+
+  Enter a value: yes
+
+aws_s3_account_public_access_block.s3_pab: Creating...
+aws_key_pair.course_ssh_key: Creating...
+aws_security_group.sg_web: Creating...
+aws_s3_bucket.s3_image: Creating...
+aws_key_pair.course_ssh_key: Creation complete after 1s [id=tf-pubcloud2020]
+aws_s3_account_public_access_block.s3_pab: Creation complete after 2s [id=143440624024]
+aws_security_group.sg_web: Creation complete after 4s [id=sg-0416ee04e11283b99]
+aws_s3_bucket.s3_image: Creation complete after 9s [id=pubcloud2020-ex3-website-auerswal]
+aws_s3_bucket_object.index: Creating...
+aws_s3_bucket_object.image: Creating...
+aws_s3_bucket_object.image: Creation complete after 1s [id=image.png]
+aws_s3_bucket_object.index: Creation complete after 1s [id=index.html]
+aws_instance.ec2_web: Creating...
+aws_instance.ec2_web: Still creating... [10s elapsed]
+aws_instance.ec2_web: Still creating... [20s elapsed]
+aws_instance.ec2_web: Creation complete after 30s [id=i-0a45886aa3298662a]
+
+Apply complete! Resources: 7 added, 0 changed, 0 destroyed.
+
+Outputs:
+
+s3_endpoint = pubcloud2020-ex3-website-auerswal.s3-website.eu-central-1.amazonaws.com
+s3_url = s3-website.eu-central-1.amazonaws.com
+web_server_ip = 18.194.233.230
+web_server_name = ec2-18-194-233-230.eu-central-1.compute.amazonaws.com
+```
+
+The static S3 web site works:
+
+```
+$ lynx -dump http://pubcloud2020-ex3-website-auerswal.s3-website.eu-central-1.amazonaws.com/
+                 PubCloud 2020 - Exercise 3 - Static S3 Website
+
+   This website is part of my solution to hands-on exercise 3 of the
+   [1]Networking in Public Cloud Deployments course in the spring of 2020.
+
+   The exercise requires hosting of an image: PubCloud 2020 Hands-on
+   Exercise 3 Image File Stored in AWS S3 (C) 2020 Erik Auerswald
+
+References
+
+   1. https://www.ipspace.net/PubCloud/
+$ wget -q -O- http://pubcloud2020-ex3-website-auerswal.s3-website.eu-central-1.amazonaws.com/image.png | md5sum
+fcee1e0ebd394059c359e15bbd2b566e  -
+$ md5sum image.png
+fcee1e0ebd394059c359e15bbd2b566e  image.png
+```
+
+The EC2 instance needs some time to start,
+install system updates,
+and install and configure the web server.
+After a short while the website is available:
+
+```
+$ lynx -dump http://ec2-18-194-233-230.eu-central-1.compute.amazonaws.com
+                PubCloud 2020 - Exercise 3 - Static EC2 Website
+
+   This website is part of my solution to hands-on exercise 3 of the
+   [1]Networking in Public Cloud Deployments course in the spring of 2020.
+
+   The following image is hosted as a static website on S3:
+
+   image stored in S3 bucket
+
+   This request was served from host ip-172-31-43-50 with local IP address
+   172.31.43.50 in availability zone eu-central-1b of region eu-central-1.
+
+References
+
+   1. https://www.ipspace.net/PubCloud/
+```
+
+The default Apache configuration does not include HTTPS:
+
+```
+$ telnet ec2-18-194-233-230.eu-central-1.compute.amazonaws.com 443
+Trying 18.194.233.230...
+telnet: Unable to connect to remote host: Connection refused
+```
+
+I remove the web server deployment using `terraform destroy`:
+
+```
+$ terraform destroy --var-file ubuntu.tfvars
+aws_key_pair.course_ssh_key: Refreshing state... [id=tf-pubcloud2020]
+aws_s3_account_public_access_block.s3_pab: Refreshing state... [id=143440624024]
+data.aws_ami.gnu_linux_image: Refreshing state...
+data.aws_vpc.default: Refreshing state...
+aws_s3_bucket.s3_image: Refreshing state... [id=pubcloud2020-ex3-website-auerswal]
+aws_security_group.sg_web: Refreshing state... [id=sg-0416ee04e11283b99]
+aws_s3_bucket_object.image: Refreshing state... [id=image.png]
+aws_s3_bucket_object.index: Refreshing state... [id=index.html]
+aws_instance.ec2_web: Refreshing state... [id=i-0a45886aa3298662a]
+
+An execution plan has been generated and is shown below.
+Resource actions are indicated with the following symbols:
+  - destroy
+
+Terraform will perform the following actions:
+
+  # aws_instance.ec2_web will be destroyed
+  - resource "aws_instance" "ec2_web" {
+      - ami                          = "ami-0e342d72b12109f91" -> null
+      - arn                          = "arn:aws:ec2:eu-central-1:143440624024:instance/i-0a45886aa3298662a" -> null
+      - associate_public_ip_address  = true -> null
+      - availability_zone            = "eu-central-1b" -> null
+      - cpu_core_count               = 1 -> null
+      - cpu_threads_per_core         = 1 -> null
+      - disable_api_termination      = false -> null
+      - ebs_optimized                = false -> null
+      - get_password_data            = false -> null
+      - hibernation                  = false -> null
+      - id                           = "i-0a45886aa3298662a" -> null
+      - instance_state               = "running" -> null
+      - instance_type                = "t2.micro" -> null
+      - ipv6_address_count           = 0 -> null
+      - ipv6_addresses               = [] -> null
+      - key_name                     = "tf-pubcloud2020" -> null
+      - monitoring                   = false -> null
+      - primary_network_interface_id = "eni-0e241c9f13d9e496a" -> null
+      - private_dns                  = "ip-172-31-43-50.eu-central-1.compute.internal" -> null
+      - private_ip                   = "172.31.43.50" -> null
+      - public_dns                   = "ec2-18-194-233-230.eu-central-1.compute.amazonaws.com" -> null
+      - public_ip                    = "18.194.233.230" -> null
+      - security_groups              = [
+          - "tf-sg-web",
+        ] -> null
+      - source_dest_check            = true -> null
+      - subnet_id                    = "subnet-e7d63b9b" -> null
+      - tags                         = {
+          - "Name" = "Web_Server_EC2_Instance"
+        } -> null
+      - tenancy                      = "default" -> null
+      - user_data                    = "455b1285756944477f035f285dceb37708d98635" -> null
+      - volume_tags                  = {} -> null
+      - vpc_security_group_ids       = [
+          - "sg-0416ee04e11283b99",
+        ] -> null
+
+      - credit_specification {
+          - cpu_credits = "standard" -> null
+        }
+
+      - root_block_device {
+          - delete_on_termination = true -> null
+          - encrypted             = false -> null
+          - iops                  = 100 -> null
+          - volume_id             = "vol-09085a84b1985f02d" -> null
+          - volume_size           = 8 -> null
+          - volume_type           = "gp2" -> null
+        }
+    }
+
+  # aws_key_pair.course_ssh_key will be destroyed
+  - resource "aws_key_pair" "course_ssh_key" {
+      - fingerprint = "bc:c0:ba:de:c1:2d:a8:38:5d:08:33:ba:dd:18:db:c4" -> null
+      - id          = "tf-pubcloud2020" -> null
+      - key_name    = "tf-pubcloud2020" -> null
+      - key_pair_id = "key-092ae5a297fdd1019" -> null
+      - public_key  = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDDiXuVGxn6zqLCPKbcojNC813FAnOPBWToBz/XTQaMzMsoAeKMRwVrUoyHEVj8UTFiuEUbTz/0jHItv5ZmFXI1DNY1m+hXxCDVcBp8ojCutX3+AJ012qG2PIZaloaYCjrTkhHj9VmMHAl1jzJ0EbPsoU/Qc4pZCNUNaCVCkG6EHisOUy9wx20i4gA/nrDnjIxk9TD2mGdlVCK7SESH/vGWgMtU6fLI65trtC4eojPNNUyMq8tTLyJxoTdYEwMY5alKkcjjw6+yVBOrtYgZSlMW02WLTkJT7eCxwVHig8a+bywiwAxuvYlUgfmOHEGEIXXTGk/+KNiLrDXdmkK4kuUvlf6rD7qR/kedqQAt0k5v/PiW3ufpej7n1ZBZroSsBT/0Yp5UcCLxpzskUYu+TRLRp+6gI50KsNe/oT8tesNtOVTK2ePD4eXApXAYwQpXy1389c4gGgh4wWljmHyeoFjcd4Soq847/PNspRdswR/u5jyswTsCROKsCJ4+whJRme8JoqaZHGBTpTu9n6gaZJVXbFM/55RYh0bpuCD5BHrdk0+HX4BmhJ1KqdDTDR84y2riwlpv6Eiw8AX8N2GVLOpP6RMt/AUCNUEy5nPWJosKb+UQE/j1dRJ9iorm2EGbh30dv/nRCb2Cu7BVyNWbmSrVaKdJub28SfV5L51sd+ATBw== auerswald@short" -> null
+      - tags        = {} -> null
+    }
+
+  # aws_s3_account_public_access_block.s3_pab will be destroyed
+  - resource "aws_s3_account_public_access_block" "s3_pab" {
+      - account_id              = "143440624024" -> null
+      - block_public_acls       = false -> null
+      - block_public_policy     = false -> null
+      - id                      = "143440624024" -> null
+      - ignore_public_acls      = false -> null
+      - restrict_public_buckets = false -> null
+    }
+
+  # aws_s3_bucket.s3_image will be destroyed
+  - resource "aws_s3_bucket" "s3_image" {
+      - acl                         = "public-read" -> null
+      - arn                         = "arn:aws:s3:::pubcloud2020-ex3-website-auerswal" -> null
+      - bucket                      = "pubcloud2020-ex3-website-auerswal" -> null
+      - bucket_domain_name          = "pubcloud2020-ex3-website-auerswal.s3.amazonaws.com" -> null
+      - bucket_regional_domain_name = "pubcloud2020-ex3-website-auerswal.s3.eu-central-1.amazonaws.com" -> null
+      - force_destroy               = false -> null
+      - hosted_zone_id              = "Z21DNDUVLTQW6Q" -> null
+      - id                          = "pubcloud2020-ex3-website-auerswal" -> null
+      - policy                      = jsonencode(
+            {
+              - Statement = [
+                  - {
+                      - Action    = "s3:GetObject"
+                      - Effect    = "Allow"
+                      - Principal = "*"
+                      - Resource  = "arn:aws:s3:::pubcloud2020-ex3-website-auerswal/*"
+                      - Sid       = "PublicReadGetObject"
+                    },
+                ]
+              - Version   = "2012-10-17"
+            }
+        ) -> null
+      - region                      = "eu-central-1" -> null
+      - request_payer               = "BucketOwner" -> null
+      - tags                        = {
+          - "Name" = "S3_bucket_for_image"
+        } -> null
+      - website_domain              = "s3-website.eu-central-1.amazonaws.com" -> null
+      - website_endpoint            = "pubcloud2020-ex3-website-auerswal.s3-website.eu-central-1.amazonaws.com" -> null
+
+      - versioning {
+          - enabled    = false -> null
+          - mfa_delete = false -> null
+        }
+
+      - website {
+          - index_document = "index.html" -> null
+        }
+    }
+
+  # aws_s3_bucket_object.image will be destroyed
+  - resource "aws_s3_bucket_object" "image" {
+      - acl           = "public-read" -> null
+      - bucket        = "pubcloud2020-ex3-website-auerswal" -> null
+      - content_type  = "image/png" -> null
+      - etag          = "fcee1e0ebd394059c359e15bbd2b566e" -> null
+      - force_destroy = false -> null
+      - id            = "image.png" -> null
+      - key           = "image.png" -> null
+      - metadata      = {} -> null
+      - source        = "../s3/image.png" -> null
+      - storage_class = "STANDARD" -> null
+      - tags          = {} -> null
+    }
+
+  # aws_s3_bucket_object.index will be destroyed
+  - resource "aws_s3_bucket_object" "index" {
+      - acl           = "public-read" -> null
+      - bucket        = "pubcloud2020-ex3-website-auerswal" -> null
+      - content_type  = "text/html" -> null
+      - etag          = "fedc37a095b63326f321a4b0562a44af" -> null
+      - force_destroy = false -> null
+      - id            = "index.html" -> null
+      - key           = "index.html" -> null
+      - metadata      = {} -> null
+      - source        = "../s3/index.html" -> null
+      - storage_class = "STANDARD" -> null
+      - tags          = {} -> null
+    }
+
+  # aws_security_group.sg_web will be destroyed
+  - resource "aws_security_group" "sg_web" {
+      - arn                    = "arn:aws:ec2:eu-central-1:143440624024:security-group/sg-0416ee04e11283b99" -> null
+      - description            = "Allow HTTP(S) and SSH access to web server" -> null
+      - egress                 = [
+          - {
+              - cidr_blocks      = [
+                  - "0.0.0.0/0",
+                ]
+              - description      = "Allow Internet access for, e.g., updates"
+              - from_port        = 0
+              - ipv6_cidr_blocks = []
+              - prefix_list_ids  = []
+              - protocol         = "-1"
+              - security_groups  = []
+              - self             = false
+              - to_port          = 0
+            },
+        ] -> null
+      - id                     = "sg-0416ee04e11283b99" -> null
+      - ingress                = [
+          - {
+              - cidr_blocks      = [
+                  - "0.0.0.0/0",
+                ]
+              - description      = "Allow HTTP from the Internet"
+              - from_port        = 80
+              - ipv6_cidr_blocks = []
+              - prefix_list_ids  = []
+              - protocol         = "tcp"
+              - security_groups  = []
+              - self             = false
+              - to_port          = 80
+            },
+          - {
+              - cidr_blocks      = [
+                  - "0.0.0.0/0",
+                ]
+              - description      = "Allow HTTPS from the Internet"
+              - from_port        = 443
+              - ipv6_cidr_blocks = []
+              - prefix_list_ids  = []
+              - protocol         = "tcp"
+              - security_groups  = []
+              - self             = false
+              - to_port          = 443
+            },
+          - {
+              - cidr_blocks      = [
+                  - "0.0.0.0/0",
+                ]
+              - description      = "Allow SSH from the Internet"
+              - from_port        = 22
+              - ipv6_cidr_blocks = []
+              - prefix_list_ids  = []
+              - protocol         = "tcp"
+              - security_groups  = []
+              - self             = false
+              - to_port          = 22
+            },
+          - {
+              - cidr_blocks      = []
+              - description      = "Allow everything inside the SG"
+              - from_port        = 0
+              - ipv6_cidr_blocks = []
+              - prefix_list_ids  = []
+              - protocol         = "-1"
+              - security_groups  = []
+              - self             = true
+              - to_port          = 0
+            },
+        ] -> null
+      - name                   = "tf-sg-web" -> null
+      - owner_id               = "143440624024" -> null
+      - revoke_rules_on_delete = false -> null
+      - tags                   = {
+          - "Name" = "Web_Server_Security_Group"
+        } -> null
+      - vpc_id                 = "vpc-7f13dc15" -> null
+    }
+
+Plan: 0 to add, 0 to change, 7 to destroy.
+
+Do you really want to destroy all resources?
+  Terraform will destroy all your managed infrastructure, as shown above.
+  There is no undo. Only 'yes' will be accepted to confirm.
+
+  Enter a value: yes
+
+aws_s3_account_public_access_block.s3_pab: Destroying... [id=143440624024]
+aws_instance.ec2_web: Destroying... [id=i-0a45886aa3298662a]
+aws_s3_account_public_access_block.s3_pab: Destruction complete after 1s
+aws_instance.ec2_web: Still destroying... [id=i-0a45886aa3298662a, 10s elapsed]
+aws_instance.ec2_web: Still destroying... [id=i-0a45886aa3298662a, 20s elapsed]
+aws_instance.ec2_web: Destruction complete after 28s
+aws_key_pair.course_ssh_key: Destroying... [id=tf-pubcloud2020]
+aws_s3_bucket_object.image: Destroying... [id=image.png]
+aws_s3_bucket_object.index: Destroying... [id=index.html]
+aws_security_group.sg_web: Destroying... [id=sg-0416ee04e11283b99]
+aws_key_pair.course_ssh_key: Destruction complete after 0s
+aws_s3_bucket_object.index: Destruction complete after 0s
+aws_s3_bucket_object.image: Destruction complete after 0s
+aws_s3_bucket.s3_image: Destroying... [id=pubcloud2020-ex3-website-auerswal]
+aws_security_group.sg_web: Destruction complete after 1s
+aws_s3_bucket.s3_image: Destruction complete after 0s
+
+Destroy complete! Resources: 7 destroyed.
+```
+
+Then I verify via AWS CLI that the cloud resources have been removed:
+
+```
+$ aws s3 ls
+auerswald@short:~/work/pubcloud2020/pubcloud2020-solutions/ex3-web/terraform$ aws ec2 describe-instances
+----------------------------------------------------------------------------
+|                             DescribeInstances                            |
++--------------------------------------------------------------------------+
+||                              Reservations                              ||
+|+-----------------------------+------------------------------------------+|
+||  OwnerId                    |  143440624024                            ||
+||  ReservationId              |  r-08edc8f571d4aa539                     ||
+|+-----------------------------+------------------------------------------+|
+|||                               Instances                              |||
+||+------------------------+---------------------------------------------+||
+|||  AmiLaunchIndex        |  0                                          |||
+|||  Architecture          |  x86_64                                     |||
+|||  ClientToken           |                                             |||
+|||  EbsOptimized          |  False                                      |||
+|||  EnaSupport            |  True                                       |||
+|||  Hypervisor            |  xen                                        |||
+|||  ImageId               |  ami-0e342d72b12109f91                      |||
+|||  InstanceId            |  i-0a45886aa3298662a                        |||
+|||  InstanceType          |  t2.micro                                   |||
+|||  KeyName               |  tf-pubcloud2020                            |||
+|||  LaunchTime            |  2020-04-19T19:26:48.000Z                   |||
+|||  PrivateDnsName        |                                             |||
+|||  PublicDnsName         |                                             |||
+|||  RootDeviceName        |  /dev/sda1                                  |||
+|||  RootDeviceType        |  ebs                                        |||
+|||  StateTransitionReason |  User initiated (2020-04-19 19:45:05 GMT)   |||
+|||  VirtualizationType    |  hvm                                        |||
+||+------------------------+---------------------------------------------+||
+||||                             Monitoring                             ||||
+|||+----------------------------+---------------------------------------+|||
+||||  State                     |  disabled                             ||||
+|||+----------------------------+---------------------------------------+|||
+||||                              Placement                             ||||
+|||+------------------------------------+-------------------------------+|||
+||||  AvailabilityZone                  |  eu-central-1b                ||||
+||||  GroupName                         |                               ||||
+||||  Tenancy                           |  default                      ||||
+|||+------------------------------------+-------------------------------+|||
+||||                                State                               ||||
+|||+-----------------------+--------------------------------------------+|||
+||||  Code                 |  48                                        ||||
+||||  Name                 |  terminated                                ||||
+|||+-----------------------+--------------------------------------------+|||
+||||                             StateReason                            ||||
+|||+---------+----------------------------------------------------------+|||
+||||  Code   |  Client.UserInitiatedShutdown                            ||||
+||||  Message|  Client.UserInitiatedShutdown: User initiated shutdown   ||||
+|||+---------+----------------------------------------------------------+|||
+||||                                Tags                                ||||
+|||+----------------+---------------------------------------------------+|||
+||||  Key           |  Name                                             ||||
+||||  Value         |  Web_Server_EC2_Instance                          ||||
+|||+----------------+---------------------------------------------------+|||
+||                              Reservations                              ||
+|+-----------------------------+------------------------------------------+|
+||  OwnerId                    |  143440624024                            ||
+||  ReservationId              |  r-07b3732cbe746f0d0                     ||
+|+-----------------------------+------------------------------------------+|
+|||                               Instances                              |||
+||+------------------------+---------------------------------------------+||
+|||  AmiLaunchIndex        |  0                                          |||
+|||  Architecture          |  x86_64                                     |||
+|||  ClientToken           |                                             |||
+|||  EbsOptimized          |  False                                      |||
+|||  EnaSupport            |  True                                       |||
+|||  Hypervisor            |  xen                                        |||
+|||  ImageId               |  ami-0e342d72b12109f91                      |||
+|||  InstanceId            |  i-09e2753ebb2dae675                        |||
+|||  InstanceType          |  t2.micro                                   |||
+|||  KeyName               |  tf-pubcloud2020                            |||
+|||  LaunchTime            |  2020-04-19T18:21:25.000Z                   |||
+|||  PrivateDnsName        |                                             |||
+|||  PublicDnsName         |                                             |||
+|||  RootDeviceName        |  /dev/sda1                                  |||
+|||  RootDeviceType        |  ebs                                        |||
+|||  StateTransitionReason |  User initiated (2020-04-19 19:06:48 GMT)   |||
+|||  VirtualizationType    |  hvm                                        |||
+||+------------------------+---------------------------------------------+||
+||||                             Monitoring                             ||||
+|||+----------------------------+---------------------------------------+|||
+||||  State                     |  disabled                             ||||
+|||+----------------------------+---------------------------------------+|||
+||||                              Placement                             ||||
+|||+------------------------------------+-------------------------------+|||
+||||  AvailabilityZone                  |  eu-central-1b                ||||
+||||  GroupName                         |                               ||||
+||||  Tenancy                           |  default                      ||||
+|||+------------------------------------+-------------------------------+|||
+||||                                State                               ||||
+|||+-----------------------+--------------------------------------------+|||
+||||  Code                 |  48                                        ||||
+||||  Name                 |  terminated                                ||||
+|||+-----------------------+--------------------------------------------+|||
+||||                             StateReason                            ||||
+|||+---------+----------------------------------------------------------+|||
+||||  Code   |  Client.UserInitiatedShutdown                            ||||
+||||  Message|  Client.UserInitiatedShutdown: User initiated shutdown   ||||
+|||+---------+----------------------------------------------------------+|||
+||||                                Tags                                ||||
+|||+----------------+---------------------------------------------------+|||
+||||  Key           |  Name                                             ||||
+||||  Value         |  Web_Server_EC2_Instance                          ||||
+|||+----------------+---------------------------------------------------+|||
+auerswald@short:~/work/pubcloud2020/pubcloud2020-solutions/ex3-web/terraform$ aws ec2 describe-vpcs
+---------------------------------------------------------------------------------------------------
+|                                          DescribeVpcs                                           |
++-------------------------------------------------------------------------------------------------+
+||                                             Vpcs                                              ||
+|+---------------+----------------+------------------+------------+-------------+----------------+|
+||   CidrBlock   | DhcpOptionsId  | InstanceTenancy  | IsDefault  |    State    |     VpcId      ||
+|+---------------+----------------+------------------+------------+-------------+----------------+|
+||  172.31.0.0/16|  dopt-983cf3f2 |  default         |  True      |  available  |  vpc-7f13dc15  ||
+|+---------------+----------------+------------------+------------+-------------+----------------+|
+|||                                   CidrBlockAssociationSet                                   |||
+||+--------------------------------------------------------+------------------------------------+||
+|||                      AssociationId                     |             CidrBlock              |||
+||+--------------------------------------------------------+------------------------------------+||
+|||  vpc-cidr-assoc-f576a99e                               |  172.31.0.0/16                     |||
+||+--------------------------------------------------------+------------------------------------+||
+||||                                      CidrBlockState                                       ||||
+|||+----------------------------------+--------------------------------------------------------+|||
+||||  State                           |  associated                                            ||||
+|||+----------------------------------+--------------------------------------------------------+|||
+auerswald@short:~/work/pubcloud2020/pubcloud2020-solutions/ex3-web/terraform$ aws ec2 describe-security-groups
+----------------------------------------------------------------------------------------------
+|                                   DescribeSecurityGroups                                   |
++--------------------------------------------------------------------------------------------+
+||                                      SecurityGroups                                      ||
+|+-----------------------------+--------------+------------+---------------+----------------+|
+||         Description         |   GroupId    | GroupName  |    OwnerId    |     VpcId      ||
+|+-----------------------------+--------------+------------+---------------+----------------+|
+||  default VPC security group |  sg-805b23e7 |  default   |  143440624024 |  vpc-7f13dc15  ||
+|+-----------------------------+--------------+------------+---------------+----------------+|
+|||                                      IpPermissions                                     |||
+||+----------------------------------------------------------------------------------------+||
+|||                                       IpProtocol                                       |||
+||+----------------------------------------------------------------------------------------+||
+|||  -1                                                                                    |||
+||+----------------------------------------------------------------------------------------+||
+||||                                   UserIdGroupPairs                                   ||||
+|||+-----------------------------------------+--------------------------------------------+|||
+||||                 GroupId                 |                  UserId                    ||||
+|||+-----------------------------------------+--------------------------------------------+|||
+||||  sg-805b23e7                            |  143440624024                              ||||
+|||+-----------------------------------------+--------------------------------------------+|||
+|||                                   IpPermissionsEgress                                  |||
+||+----------------------------------------------------------------------------------------+||
+|||                                       IpProtocol                                       |||
+||+----------------------------------------------------------------------------------------+||
+|||  -1                                                                                    |||
+||+----------------------------------------------------------------------------------------+||
+||||                                       IpRanges                                       ||||
+|||+--------------------------------------------------------------------------------------+|||
+||||                                        CidrIp                                        ||||
+|||+--------------------------------------------------------------------------------------+|||
+||||  0.0.0.0/0                                                                           ||||
+|||+--------------------------------------------------------------------------------------+|||
+auerswald@short:~/work/pubcloud2020/pubcloud2020-solutions/ex3-web/terraform$ aws ec2 describe-key-pairs
+------------------
+|DescribeKeyPairs|
++----------------+
+```
+
+The EC2 instances are still shown,
+but in a state of *terminated*.
+The other resources are no longer shown at all.
+
+That's all for now,
+I won't try out Amazon Linux 2, nginx, or the `runcmd:` cloud-init method yet.
 
 ---
 
