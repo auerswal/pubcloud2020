@@ -1558,7 +1558,7 @@ Then I verify via AWS CLI that the cloud resources have been removed:
 
 ```
 $ aws s3 ls
-auerswald@short:~/work/pubcloud2020/pubcloud2020-solutions/ex3-web/terraform$ aws ec2 describe-instances
+$ aws ec2 describe-instances
 ----------------------------------------------------------------------------
 |                             DescribeInstances                            |
 +--------------------------------------------------------------------------+
@@ -1662,7 +1662,7 @@ auerswald@short:~/work/pubcloud2020/pubcloud2020-solutions/ex3-web/terraform$ aw
 ||||  Key           |  Name                                             ||||
 ||||  Value         |  Web_Server_EC2_Instance                          ||||
 |||+----------------+---------------------------------------------------+|||
-auerswald@short:~/work/pubcloud2020/pubcloud2020-solutions/ex3-web/terraform$ aws ec2 describe-vpcs
+$ aws ec2 describe-vpcs
 ---------------------------------------------------------------------------------------------------
 |                                          DescribeVpcs                                           |
 +-------------------------------------------------------------------------------------------------+
@@ -1682,7 +1682,7 @@ auerswald@short:~/work/pubcloud2020/pubcloud2020-solutions/ex3-web/terraform$ aw
 |||+----------------------------------+--------------------------------------------------------+|||
 ||||  State                           |  associated                                            ||||
 |||+----------------------------------+--------------------------------------------------------+|||
-auerswald@short:~/work/pubcloud2020/pubcloud2020-solutions/ex3-web/terraform$ aws ec2 describe-security-groups
+$ aws ec2 describe-security-groups
 ----------------------------------------------------------------------------------------------
 |                                   DescribeSecurityGroups                                   |
 +--------------------------------------------------------------------------------------------+
@@ -1716,7 +1716,7 @@ auerswald@short:~/work/pubcloud2020/pubcloud2020-solutions/ex3-web/terraform$ aw
 |||+--------------------------------------------------------------------------------------+|||
 ||||  0.0.0.0/0                                                                           ||||
 |||+--------------------------------------------------------------------------------------+|||
-auerswald@short:~/work/pubcloud2020/pubcloud2020-solutions/ex3-web/terraform$ aws ec2 describe-key-pairs
+$ aws ec2 describe-key-pairs
 ------------------
 |DescribeKeyPairs|
 +----------------+
