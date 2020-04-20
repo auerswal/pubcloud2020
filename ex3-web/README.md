@@ -211,6 +211,10 @@ does not allow SSH access.
 Thus I expect to need to either update the default security group,
 or create a suitable security group as well.
 
+**Update 2020-04-20:** Instead of using the AWS Key Pair functionality,
+using cloud-init (see below) could be used to manage public SSH keys.
+Cloud-init is not limited to RSA Keys, as far as I know.
+
 ### 2. Deploy a VM in the default VPC
 
 Deploying a virtual machine (VM) respectively EC2 instance is a preparatory
