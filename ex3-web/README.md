@@ -1749,6 +1749,13 @@ I did not care for the `website_domain`,
 but rather for the `website_endpoint`.
 Thus I removed the `website_domain` from the Terraform configuration outputs.*
 
+**Update 2020-04-23:**
+*Destroying* the Terraform configuration that contained S3 Public Access Block
+removal did *not* re-instate the block.
+S3 buckets can still be opened to the Internet.
+This behavior is consistent with Terraform's documented behavior
+regarding a VPC's default Security Group.
+
 ---
 
 [PubCloud2020 GitHub repository](https://github.com/auerswal/pubcloud2020) |
