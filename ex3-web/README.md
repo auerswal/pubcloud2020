@@ -16,6 +16,7 @@ Thus just creating an
 bucket and enabling
 [static website hosting](https://docs.aws.amazon.com/AmazonS3/latest/dev/HostingWebsiteOnS3Setup.html)
 there misses the point.
+That would result in a static webseite hosted on AWS, though.
 
 ## Overview
 
