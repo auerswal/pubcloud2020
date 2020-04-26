@@ -1736,7 +1736,7 @@ That is quite a lot of output. ;-)
 
 Let's perform the connectivity tests asked for in the exercise description:
 
-## (Manual) connectivity Tests
+## (Manual) Connectivity Tests
 
 I have added the private SSH key to my SSH agent
 in order to easily log into the EC2 instances.
@@ -1960,9 +1960,9 @@ web_server_ip = 54.93.244.69
 web_server_name = ec2-54-93-244-69.eu-central-1.compute.amazonaws.com
 ```
 
-Now the other VM on the private subnet actually uses an IP address
+Now the other VM on the private subnet actually reports an IP address
 from the private subnet.
-Let's try the connecting via jump host again:
+Let's try connecting via jump host again:
 
 ```
 $ ssh -o ProxyJump=ubuntu@ec2-18-185-67-143.eu-central-1.compute.amazonaws.com ubuntu@10.42.0.143
