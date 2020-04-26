@@ -277,7 +277,7 @@ I write a straight-forward
 [Terraform configuration file](terraform/vni.tf)
 for this exercise.
 It is based on the previous solutions
-for hand-on exercises two and three.
+for hands-on exercises two and three.
 
 All variables have default values,
 thus I do not need to specify any variables
@@ -300,7 +300,7 @@ The EC2 instances require a few adjustments:
 specifying the correct subnet via `subnet_id`,
 no S3 dependencies,
 no specific Security Group,
-public IP address assignment accroding to selected subnet,
+public IP address assignment according to selected subnet,
 and instance specific cloud-config file as `user-data`.
 
 The Terraform
@@ -1760,7 +1760,7 @@ web_server_name = "ec2-54-93-244-69.eu-central-1.compute.amazonaws.com"
 
 ### SSH Access to Web Server and Jump Host
 
-I'll log into each of the two servers:
+I'll log into each of the two servers with public IP addresses:
 
 #### Web Server
 
@@ -2340,13 +2340,13 @@ The Terraform documentation for the
 resource notes that use of an EIP should result in changing outputs
 from using the instance's `public_ip` attribute
 to the EIP's `public_ip` attribute.
-I'll just the EIP data to the existing output to see what happens.
+I'll just add the EIP data to the existing output to see what happens.
 
 ### Elastic Network Interface
 
 Each EC2 instance I have created during the exercises
 included one ENI.
-Adding another ENI adds an additional vNIC to the instance.
+Adding another ENI adds an additional "vNIC" to the instance.
 
 Similar to the idea of a management subnet,
 I'll add the ENI as a second interface to the jump host,
@@ -3098,7 +3098,7 @@ ubuntu@ip-10-42-255-147:~$ sudo dhclient eth1
 
 ```
 
-I can log into the jump host via the web server and disable `eth`:
+I can log into the jump host via the web server and disable `eth1`:
 
 ```
 $ ssh -o ProxyJump=ubuntu@3.127.94.209 ubuntu@10.42.255.147
@@ -3152,7 +3152,7 @@ ubuntu@ip-10-42-255-147:~$ ip a
 I'd say I would need another subnet in the same availability
 zone as the public one
 to use the ENI.
-I'd rather remove it from the configuration,
+I'd rather remove the ENI from the configuration,
 since I do not really need it:
 
 ```
@@ -3904,6 +3904,17 @@ ssh: Could not resolve hostname null: Name or service not known
 ```
 
 ## That's All Folks!
+
+After re-reading the exercise description I noticed
+that the EIP should have a manual dependency in the Internet Gateway.
+Thus I added this to the terraform configuration,
+but did not repeat any of the tests except running `terraform validate`:
+
+```
+$ terraform validate
+Success! The configuration is valid.
+
+```
 
 Another long exercise solution description comes to an end.
 

@@ -206,8 +206,9 @@ resource "aws_instance" "ex4_other" {
 
 # elastic IP address
 resource "aws_eip" "ex4_eip" {
-  instance = aws_instance.ex4_web.id
-  vpc      = true
+  depends_on = [aws_internet_gateway.ex4_igw]
+  instance   = aws_instance.ex4_web.id
+  vpc        = true
 }
 
 ### outputs
