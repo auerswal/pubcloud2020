@@ -224,6 +224,12 @@ output "web_server_name" {
 output "web_server_ip" {
   value = aws_instance.ex4_web.public_ip
 }
+output "web_server_private_name" {
+  value = aws_instance.ex4_web.private_dns
+}
+output "web_server_private_ip" {
+  value = aws_instance.ex4_web.private_ip
+}
 
 # jump host info
 output "jump_host_name" {
@@ -231,6 +237,12 @@ output "jump_host_name" {
 }
 output "jump_host_ip" {
   value = aws_instance.ex4_jump.public_ip
+}
+output "jump_host_privat_name" {
+  value = aws_instance.ex4_jump.private_dns
+}
+output "jump_host_privat_ip" {
+  value = aws_instance.ex4_jump.private_ip
 }
 
 # private host info
