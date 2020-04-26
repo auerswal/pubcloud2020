@@ -210,15 +210,6 @@ resource "aws_eip" "ex4_eip" {
   vpc      = true
 }
 
-# elastic network interface
-resource "aws_network_interface" "ex4_eni" {
-  subnet_id = aws_subnet.ex4_public.id
-  attachment {
-    instance     = aws_instance.ex4_jump.id
-    device_index = 1
-  }
-}
-
 ### outputs
 
 # CIDR prefixes
@@ -280,9 +271,4 @@ output "eip_private_ip" {
 }
 output "eip_private_name" {
   value = aws_eip.ex4_eip.private_dns
-}
-
-# ENI info
-output "eni_private_ip" {
-  value = aws_network_interface.ex4_eni.private_ip
 }
