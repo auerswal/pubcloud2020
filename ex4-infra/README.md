@@ -20,10 +20,10 @@ The exercise objectives for AWS are:
 
 1. Create a *VPN* and two *subnets* (public and private).
 2. Create an *Internet Gateway* and associate it with the VPC.
-3. Create a *route table* for the public subnet and add a default route
+3. Create a *route table* for the public subnet and add a *default route*
    pointing to the Internet Gateway.
 4. Adjust the *default security group* to allow HTTP, HTTPS, and SSH
-   to all virtual machines.  Use GUI if nexessary.
+   to all virtual machines.  Use GUI if necessary.
 5. (Optional) Create an *elastic IP address* and
    an *elastic network interface*.
 6. Deploy a *web server* in the public subnet (use the tools you created
@@ -55,14 +55,14 @@ I have created a new one in the [third exercise](../ex3-web/),
 and have then allowed SSH, HTTP, and HTTPS there.
 I did look into using the default Security Group,
 but decided against doing so,
-because *destroying* the Terraform would not have cleaned up
+because *destroying* the Terraform deployment would not have cleaned up
 the changes to the default Security Group.
 
 I have not yet created an
 [elastic IP address](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/elastic-ip-addresses-eip.html)
 (EIP) nor an
 [elastic network interface](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-eni.html)
-(EMI).
+(ENI).
 
 In the [third exercise](../ex3-web/),
 I have created a web server,
@@ -70,7 +70,7 @@ i.e., Apache running on Ubuntu,
 provisioned with cloud-init.
 
 Omitting the web server of the web server setup results in an SSH jump host,
-or *another* VM instance.
+or *another* VM instance. ;-)
 
 For most of this exercise I can build upon previous work.
 The simple VPC configuration from exercise 2 needs to be extended
@@ -219,8 +219,15 @@ and associated with the private subnet,
 unless the VPC does not have a Main route table,
 or the Main route table does not point to an Internet Gateway.
 
-Many route tables can be created and attached to different VPC objects,
+The subnet model behind this exercise seems to be based
+on a VPC without Internet access in the Main route table.
+Thus any subnet of this VPC is private by default
+and needs to be explicitly configured for Internet access.
+
+Many route tables can be created and attached to different objects inside a VPC,
 thus allowing for some kind of *Policy Based Routing*.
+The use of a special route table for Internet access
+is an instance of the Policy Based Routing idea.
 
 ### Elastic IP Address
 
