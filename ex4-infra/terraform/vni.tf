@@ -235,8 +235,8 @@ output "jump_host_ip" {
 
 # private host info
 output "private_host_name" {
-  value = aws_instance.ex4_jump.private_dns
+  value = aws_instance.ex4_other.private_dns
 }
 output "private_host_ip" {
-  value = aws_instance.ex4_jump.private_ip
+  value = aws_instance.ex4_other.private_ip
 }

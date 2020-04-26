@@ -847,6 +847,9 @@ web_server_name = ec2-54-93-244-69.eu-central-1.compute.amazonaws.com
 That looks promising.
 Let's find out what happened. ;-)
 
+*Spoiler:
+I messed up the output definitions for the other VM in the private subnet.*
+
 Terraform can `show` the deployment:
 
 ```
@@ -1921,6 +1924,391 @@ The VM on the private subnet should have an IP address in the 10.42.0.0/24
 network, not in 10.42.255.0/24.
 It should not be able to access the Internet.
 I'll have to look into this...
+
+...well, I messed up the output definitions.
+Thus the private IP given for the other VM
+was actually the private IP address of the jump host.
+I'll fix that and run `terraform apply` again:
+
+```
+$ terraform apply
+aws_key_pair.course_ssh_key: Refreshing state... [id=tf-pubcloud2020]
+data.aws_ami.gnu_linux_image: Refreshing state...
+aws_vpc.ex4_vpc: Refreshing state... [id=vpc-0b508a704edb473cb]
+aws_subnet.ex4_private: Refreshing state... [id=subnet-02521eb45700f5398]
+aws_subnet.ex4_public: Refreshing state... [id=subnet-07a2d8e446b100c58]
+aws_internet_gateway.ex4_igw: Refreshing state... [id=igw-0f441755d966d38af]
+aws_default_security_group.def_sg: Refreshing state... [id=sg-084a86c98ad8c2128]
+aws_instance.ex4_other: Refreshing state... [id=i-027f0cb1638fd711c]
+aws_route_table.ex4_rt: Refreshing state... [id=rtb-0667e7f44e185c197]
+aws_instance.ex4_jump: Refreshing state... [id=i-0e2bdac3c56bd21e5]
+aws_instance.ex4_web: Refreshing state... [id=i-023b492515018c825]
+aws_route_table_association.rt2public: Refreshing state... [id=rtbassoc-03399492da585a8f6]
+
+Apply complete! Resources: 0 added, 0 changed, 0 destroyed.
+
+Outputs:
+
+VPC_prefix = 10.42.0.0/16
+jump_host_ip = 18.185.67.143
+jump_host_name = ec2-18-185-67-143.eu-central-1.compute.amazonaws.com
+private_host_ip = 10.42.0.143
+private_host_name = ip-10-42-0-143.eu-central-1.compute.internal
+private_subnet_prefix = 10.42.0.0/24
+public_subnet_prefix = 10.42.255.0/24
+web_server_ip = 54.93.244.69
+web_server_name = ec2-54-93-244-69.eu-central-1.compute.amazonaws.com
+```
+
+Now the other VM on the private subnet actually uses an IP address
+from the private subnet.
+Let's try the connecting via jump host again:
+
+```
+$ ssh -o ProxyJump=ubuntu@ec2-18-185-67-143.eu-central-1.compute.amazonaws.com ubuntu@10.42.0.143
+The authenticity of host '10.42.0.143 (<no hostip for proxy command>)' can't be established.
+ECDSA key fingerprint is SHA256:I+YKegzDgB9IEg3bpo825toaY7vfAgyWIONTPJ6A8PQ.
+Are you sure you want to continue connecting (yes/no)? yes
+Warning: Permanently added '10.42.0.143' (ECDSA) to the list of known hosts.
+Welcome to Ubuntu 18.04.4 LTS (GNU/Linux 4.15.0-1065-aws x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/advantage
+
+  System information as of Sun Apr 26 15:06:13 UTC 2020
+
+  System load:  0.0               Processes:           86
+  Usage of /:   13.7% of 7.69GB   Users logged in:     0
+  Memory usage: 14%               IP address for eth0: 10.42.0.143
+  Swap usage:   0%
+
+0 packages can be updated.
+0 updates are security updates.
+
+
+
+The programs included with the Ubuntu system are free software;
+the exact distribution terms for each program are described in the
+individual files in /usr/share/doc/*/copyright.
+
+Ubuntu comes with ABSOLUTELY NO WARRANTY, to the extent permitted by
+applicable law.
+
+To run a command as administrator (user "root"), use "sudo <command>".
+See "man sudo_root" for details.
+
+ubuntu@ip-10-42-0-143:~$ ls /var/www/html
+ls: cannot access '/var/www/html': No such file or directory
+ubuntu@ip-10-42-0-143:~$ ip a
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host
+       valid_lft forever preferred_lft forever
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9001 qdisc fq_codel state UP group default qlen 1000
+    link/ether 0a:46:e4:e4:85:72 brd ff:ff:ff:ff:ff:ff
+    inet 10.42.0.143/24 brd 10.42.0.255 scope global dynamic eth0
+       valid_lft 2948sec preferred_lft 2948sec
+    inet6 fe80::846:e4ff:fee4:8572/64 scope link
+       valid_lft forever preferred_lft forever
+ubuntu@ip-10-42-0-143:~$ ping -c2 8.8.8.8
+PING 8.8.8.8 (8.8.8.8) 56(84) bytes of data.
+
+--- 8.8.8.8 ping statistics ---
+2 packets transmitted, 0 received, 100% packet loss, time 1024ms
+
+ubuntu@ip-10-42-0-143:~$ ping -c2 10.42.255.153
+PING 10.42.255.153 (10.42.255.153) 56(84) bytes of data.
+64 bytes from 10.42.255.153: icmp_seq=1 ttl=64 time=0.944 ms
+64 bytes from 10.42.255.153: icmp_seq=2 ttl=64 time=0.880 ms
+
+--- 10.42.255.153 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1001ms
+rtt min/avg/max/mdev = 0.880/0.912/0.944/0.032 ms
+ubuntu@ip-10-42-0-143:~$ ping -c2 10.42.255.147
+PING 10.42.255.147 (10.42.255.147) 56(84) bytes of data.
+64 bytes from 10.42.255.147: icmp_seq=1 ttl=64 time=0.896 ms
+64 bytes from 10.42.255.147: icmp_seq=2 ttl=64 time=0.990 ms
+
+--- 10.42.255.147 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1028ms
+rtt min/avg/max/mdev = 0.896/0.943/0.990/0.047 ms
+ubuntu@ip-10-42-0-143:~$ host www.ipspace.net
+www.ipspace.net has address 104.26.2.69
+www.ipspace.net has address 104.26.3.69
+www.ipspace.net has IPv6 address 2606:4700:20::681a:345
+www.ipspace.net has IPv6 address 2606:4700:20::681a:245
+ubuntu@ip-10-42-0-143:~$ ping -c2 www.ipspace.net
+PING www.ipspace.net (104.26.3.69) 56(84) bytes of data.
+
+--- www.ipspace.net ping statistics ---
+2 packets transmitted, 0 received, 100% packet loss, time 1023ms
+
+ubuntu@ip-10-42-0-143:~$ logout
+Connection to 10.42.0.143 closed.
+```
+
+That is better. :-)
+
+### VM in Private Subnet Cannot Reach Internet
+
+This was tested above.
+
+## Where Are We Now?
+
+So far I have created the mandatory pieces for this exercise.
+Next on the agenda are *elastic IP address* and *elastic network interface*.
+I will add them to the Terraform configuration and use `terraform apply`
+to add them to the deployment.
+But first I want to show the current state of the Terraform configuration:
+
+```
+$ cat vni.tf
+# Terraform configuration for AWS virtual network infrastructure.
+# Copyright (C) 2020  Erik Auerswald <auerswal@unix-ag.uni-kl.de>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# providers - AWS in this case, region from AWS CLI is ignored
+provider "aws" {
+  version = "~> 2.52"
+  profile = "default"
+  region  = "eu-central-1"
+}
+
+### variables
+
+# select AMI flavor for VMs
+variable "ami_owner" {
+  default = "099720109477"
+}
+variable "ami_name" {
+  default = "ubuntu/images/hvm-ssd/ubuntu-*-18.04-amd64-server-????????"
+}
+
+# CIDR prefixes to use
+variable "vpc_prefix" {
+  default = "10.42.0.0/16"
+}
+variable "priv_prefix" {
+  default = "10.42.0.0/24"
+}
+variable "pub_prefix" {
+  default = "10.42.255.0/24"
+}
+
+### data sources
+
+# AMI ID for web server
+data "aws_ami" "gnu_linux_image" {
+  owners      = [var.ami_owner]
+  most_recent = true
+  filter {
+    name   = "name"
+    values = [var.ami_name]
+  }
+  filter {
+    name   = "state"
+    values = ["available"]
+  }
+}
+
+### resources
+
+# public SSH key for remote access to EC2 instances
+resource "aws_key_pair" "course_ssh_key" {
+  key_name   = "tf-pubcloud2020"
+  public_key = file("../../../pubcloud2020_rsa_id.pub")
+}
+
+# a new VPC for this deployment
+resource "aws_vpc" "ex4_vpc" {
+  cidr_block           = var.vpc_prefix
+  enable_dns_support   = true
+  enable_dns_hostnames = true
+  # dedicated hardware not needed -> use default tenancy
+  instance_tenancy = "default"
+  tags = {
+    Name = "Ex. 4 VPC"
+  }
+}
+
+# a new (public) subnet in the new VPC
+resource "aws_subnet" "ex4_public" {
+  vpc_id                  = aws_vpc.ex4_vpc.id
+  cidr_block              = var.pub_prefix
+  map_public_ip_on_launch = true
+  tags = {
+    Name = "Ex. 4 public subnet"
+  }
+}
+
+# a new (private) subnet in the new VPC
+resource "aws_subnet" "ex4_private" {
+  vpc_id     = aws_vpc.ex4_vpc.id
+  cidr_block = var.priv_prefix
+  tags = {
+    Name = "Ex. 4 private subnet"
+  }
+}
+
+# a new Internet Gateway for the VPC
+resource "aws_internet_gateway" "ex4_igw" {
+  vpc_id = aws_vpc.ex4_vpc.id
+  tags = {
+    Name = "Ex. 4 Internet gateway"
+  }
+}
+
+# a new route table for the public subnet with default route to the IGW
+resource "aws_route_table" "ex4_rt" {
+  vpc_id = aws_vpc.ex4_vpc.id
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.ex4_igw.id
+  }
+  tags = {
+    Name = "Ex. 4 route table for Internet access"
+  }
+}
+
+# associate the route table with the public subnet
+resource "aws_route_table_association" "rt2public" {
+  subnet_id      = aws_subnet.ex4_public.id
+  route_table_id = aws_route_table.ex4_rt.id
+}
+
+# default Security Group of the new VPC
+resource "aws_default_security_group" "def_sg" {
+  vpc_id = aws_vpc.ex4_vpc.id
+  ingress {
+    self        = true
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    description = "Allow everything inside the SG"
+  }
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "Allow SSH from the Internet"
+  }
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "Allow HTTP from the Internet"
+  }
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "Allow HTTPS from the Internet"
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "Allow Internet access for, e.g., updates"
+  }
+  tags = {
+    Name = "Ex. 4 default Security Group"
+  }
+}
+
+# web server EC2 instance
+resource "aws_instance" "ex4_web" {
+  depends_on    = [aws_internet_gateway.ex4_igw]
+  ami           = data.aws_ami.gnu_linux_image.id
+  instance_type = "t2.micro"
+  subnet_id     = aws_subnet.ex4_public.id
+  key_name      = aws_key_pair.course_ssh_key.id
+  user_data     = file("web_server.cloud-config")
+  tags = {
+    Name = "Ex. 4 web server"
+  }
+}
+
+# jump host EC2 instance
+resource "aws_instance" "ex4_jump" {
+  depends_on    = [aws_internet_gateway.ex4_igw]
+  ami           = data.aws_ami.gnu_linux_image.id
+  instance_type = "t2.micro"
+  subnet_id     = aws_subnet.ex4_public.id
+  key_name      = aws_key_pair.course_ssh_key.id
+  user_data     = file("jump_host.cloud-config")
+  tags = {
+    Name = "Ex. 4 jump host"
+  }
+}
+
+# another EC2 instance
+resource "aws_instance" "ex4_other" {
+  ami           = data.aws_ami.gnu_linux_image.id
+  instance_type = "t2.micro"
+  subnet_id     = aws_subnet.ex4_private.id
+  key_name      = aws_key_pair.course_ssh_key.id
+  user_data     = file("another.cloud-config")
+  tags = {
+    Name = "Ex. 4 private host"
+  }
+}
+
+### outputs
+
+# CIDR prefixes
+output "VPC_prefix" {
+  value = aws_vpc.ex4_vpc.cidr_block
+}
+output "private_subnet_prefix" {
+  value = aws_subnet.ex4_private.cidr_block
+}
+output "public_subnet_prefix" {
+  value = aws_subnet.ex4_public.cidr_block
+}
+
+# web server info
+output "web_server_name" {
+  value = aws_instance.ex4_web.public_dns
+}
+output "web_server_ip" {
+  value = aws_instance.ex4_web.public_ip
+}
+
+# jump host info
+output "jump_host_name" {
+  value = aws_instance.ex4_jump.public_dns
+}
+output "jump_host_ip" {
+  value = aws_instance.ex4_jump.public_ip
+}
+
+# private host info
+output "private_host_name" {
+  value = aws_instance.ex4_other.private_dns
+}
+output "private_host_ip" {
+  value = aws_instance.ex4_other.private_ip
+}
+```
 
 ---
 
