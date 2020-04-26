@@ -17,6 +17,8 @@ This probably takes more time than just hacking togther a solution,
 but it results in a better learning experience for me.
 Additionally, I take notes while working on the assignments,
 instead of creating a report after the fact.
+I even keep mistakes in the report,
+as long as I think they can be a useful reference.
 
 ## Links to the Exercise Solutions
 
