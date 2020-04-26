@@ -223,6 +223,8 @@ The subnet model behind this exercise seems to be based
 on a VPC without Internet access in the Main route table.
 Thus any subnet of this VPC is private by default
 and needs to be explicitly configured for Internet access.
+This seems to be more secure than requiring to add configuration
+to inhibit Internet access.
 
 Many route tables can be created and attached to different objects inside a VPC,
 thus allowing for some kind of *Policy Based Routing*.
