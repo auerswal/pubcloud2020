@@ -15,6 +15,8 @@ I want to really understand what happens,
 and I want to create a reference for me.
 This probably takes more time than just hacking togther a solution,
 but it results in a better learning experience for me.
+Additionally, I take notes while working on the assignments,
+instead of creating a report after the fact.
 
 ## Links to the Exercise Solutions
 
