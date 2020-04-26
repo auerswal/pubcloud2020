@@ -212,7 +212,7 @@ resource "aws_eip" "ex4_eip" {
 
 # elastic network interface
 resource "aws_network_interface" "ex4_eni" {
-  subnet_id = aws_subnet.ex4_private.id
+  subnet_id = aws_subnet.ex4_public.id
   attachment {
     instance     = aws_instance.ex4_jump.id
     device_index = 1
