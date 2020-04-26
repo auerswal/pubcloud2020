@@ -204,6 +204,21 @@ resource "aws_instance" "ex4_other" {
   }
 }
 
+# elastic IP address
+resource "aws_eip" "ex4_eip" {
+  instance = aws_instance.ex4_web.id
+  vpc      = true
+}
+
+# elastic network interface
+resource "aws_network_interface" "ex4_eni" {
+  subnet_id = aws_subnet.ex4_private.id
+  attachment {
+    instance     = aws_instance.ex4_jump.id
+    device_index = 1
+  }
+}
+
 ### outputs
 
 # CIDR prefixes
@@ -217,7 +232,7 @@ output "public_subnet_prefix" {
   value = aws_subnet.ex4_public.cidr_block
 }
 
-# web server info
+# web server info (probably wrong b/c of EIP)
 output "web_server_name" {
   value = aws_instance.ex4_web.public_dns
 }
@@ -251,4 +266,23 @@ output "private_host_name" {
 }
 output "private_host_ip" {
   value = aws_instance.ex4_other.private_ip
+}
+
+# EIP info
+output "eip_ip" {
+  value = aws_eip.ex4_eip.public_ip
+}
+output "eip_name" {
+  value = aws_eip.ex4_eip.public_dns
+}
+output "eip_private_ip" {
+  value = aws_eip.ex4_eip.private_ip
+}
+output "eip_private_name" {
+  value = aws_eip.ex4_eip.private_dns
+}
+
+# ENI info
+output "eni_private_ip" {
+  value = aws_network_interface.ex4_eni.private_ip
 }
