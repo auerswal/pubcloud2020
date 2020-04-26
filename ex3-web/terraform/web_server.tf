@@ -1,4 +1,4 @@
-# Terraform configuration for an AWS Virtual Private Cloud (VPC).
+# Terraform configuration for a static website on AWS.
 # Copyright (C) 2020  Erik Auerswald <auerswal@unix-ag.uni-kl.de>
 #
 # This program is free software: you can redistribute it and/or modify
