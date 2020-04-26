@@ -28,6 +28,9 @@ as long as I think they can be a useful reference.
 3. [Deploy a Cloud-Based Web Server](ex3-web/) - all of SSH, Security Groups,
    EC2, Cloud-Init, S3, and S3 static web site hosting in a single Terraform
    configuration
+4. [Deploy a Virtual Network Infrastructure](ex4-infra/) - a VPC, public and
+   private subnets, elastic IP address, elastic network interfaces, and
+   three EC2 instances
 
 ---
 

@@ -29,48 +29,48 @@ SSH_OPTS='-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null'
 trap 'printf -- "***\n*** --- CONNECTIVITY TEST FAILED ---\n***\n"' ERR
 
 # directly connect to web server via elastic IP address
-echo 'connecting to elastic IP address via IP address...'
+echo '--> connecting to elastic IP address via IP address...'
 EIP_IP=$(jq -r '.outputs.eip_ip.value' "$TF_STATE")
 ssh $SSH_OPTS "${R_USER}@${EIP_IP}" true
 echo '--> OK'
-echo 'connecting to elastic IP address via DNS name...'
+echo '--> connecting to elastic IP address via DNS name...'
 EIP_DNS=$(jq -r '.outputs.eip_name.value' "$TF_STATE")
 ssh $SSH_OPTS "${R_USER}@${EIP_DNS}" true
 echo '--> OK'
 
 # directly connect to jump server
-echo 'connecting to jump server via IP address...'
+echo '--> connecting to jump server via IP address...'
 J_IP=$(jq -r '.outputs.jump_host_ip.value' "$TF_STATE")
 ssh $SSH_OPTS "${R_USER}@${J_IP}" true
 echo '--> OK'
-echo 'connecting to jump server via DNS name...'
+echo '--> connecting to jump server via DNS name...'
 J_DNS=$(jq -r '.outputs.jump_host_name.value' "$TF_STATE")
 ssh $SSH_OPTS "${R_USER}@${J_DNS}" true
 echo '--> OK'
 
 # access web page
-echo 'accessing web page via IP address...'
+echo '--> accessing web page via IP address...'
 wget -q -O/dev/null "http://${EIP_IP}/"
 echo '--> OK'
-echo 'accessing web page via DNS name...'
+echo '--> accessing web page via DNS name...'
 wget -q -O/dev/null "http://${EIP_DNS}/"
 echo '--> OK'
 
 # access host on private subnet via jump host
-echo 'connecting via jump host to host on private subnet...'
+echo '--> connecting via jump host to host on private subnet...'
 P_IP=$(jq -r '.outputs.private_host_ip.value' "$TF_STATE")
 ssh $SSH_OPTS -o "ProxyJump=${R_USER}@${J_IP}" "${R_USER}@${P_IP}" true
 echo '--> OK'
 
 # ping internal IP of web server from host on private subnet
-echo 'testing internal connectivity of host on private subnet...'
+echo '--> testing internal connectivity of host on private subnet...'
 W_P_IP=$(jq -r '.outputs.web_server_private_ip.value' "$TF_STATE")
 ssh $SSH_OPTS -o "ProxyJump=${R_USER}@${J_IP}" "${R_USER}@${P_IP}" \
   "ping -c2 $W_P_IP"
 echo '--> OK'
 
 # ping Google's 8.8.8.8 from host on private subnet
-echo 'testing for no external connectivity of host on private subnet...'
+echo '--> testing for no external connectivity of host on private subnet...'
 W_P_IP=$(jq -r '.outputs.web_server_private_ip.value' "$TF_STATE")
 if ssh $SSH_OPTS -o "ProxyJump=${R_USER}@${J_IP}" "${R_USER}@${P_IP}" \
   'ping -c2 8.8.8.8'
@@ -81,4 +81,4 @@ echo '--> OK'
 
 # report success if this point in the script is reached
 echo
-echo 'All tests passed successfully, :-)'
+echo '==> All tests passed successfully, :-)'

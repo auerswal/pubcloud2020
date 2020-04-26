@@ -2059,7 +2059,7 @@ This was tested above.
 ## Where Are We Now?
 
 So far I have created the mandatory pieces for this exercise.
-Next on the agenda are *elastic IP address* and *elastic network interface*.
+Next on the agenda are *Elastic IP Address* and *Elastic Network Interface*.
 I will add them to the Terraform configuration and use `terraform apply`
 to add them to the deployment.
 But first I want to show the current state of the Terraform configuration:
@@ -2309,6 +2309,1603 @@ output "private_host_ip" {
   value = aws_instance.ex4_other.private_ip
 }
 ```
+
+I'll add private IP information to the web server and jump host outputs.
+
+## Optional Exercises
+
+This hands-on exercise is comprised of mandatory and optional objectives.
+After completing the mandatory objectives,
+I continue with the optional ones.
+First are *Elastic IP Address* and *Elastic Network Interface*.
+Afterwards I'll look into automating the connectivity tests.
+
+I want to add an Elastic IP Address to the web server,
+and add an Elastic Network Interface to the jump host.
+
+### Elastic IP Address
+
+An Elastic IP Address is an independent AWS object.
+In Terraform,
+it is a *resource* that can be created
+and associated with, e.g., an EC2 instance.
+Since I do not have any pre-existing EIPs that I might want to use,
+I'll use the
+[aws\_eip](https://www.terraform.io/docs/providers/aws/r/eip.html)
+resource instead of
+[aws\_eip\_association](https://www.terraform.io/docs/providers/aws/r/eip_association.html).
+
+The Terraform documentation for the
+[aws\_instance](https://www.terraform.io/docs/providers/aws/r/instance.html)
+resource notes that use of an EIP should result in changing outputs
+from using the instance's `public_ip` attribute
+to the EIP's `public_ip` attribute.
+I'll just the EIP data to the existing output to see what happens.
+
+### Elastic Network Interface
+
+Each EC2 instance I have created during the exercises
+included one ENI.
+Adding another ENI adds an additional vNIC to the instance.
+
+Similar to the idea of a management subnet,
+I'll add the ENI as a second interface to the jump host,
+connected to the private subnet.
+
+### Applying the Additions with Terraform
+
+Again I'll use `terraform validate` and `terraform apply`:
+
+```
+$ terraform validate
+Success! The configuration is valid.
+
+$ terraform apply
+aws_key_pair.course_ssh_key: Refreshing state... [id=tf-pubcloud2020]
+aws_vpc.ex4_vpc: Refreshing state... [id=vpc-0b508a704edb473cb]
+data.aws_ami.gnu_linux_image: Refreshing state...
+aws_internet_gateway.ex4_igw: Refreshing state... [id=igw-0f441755d966d38af]
+aws_subnet.ex4_public: Refreshing state... [id=subnet-07a2d8e446b100c58]
+aws_subnet.ex4_private: Refreshing state... [id=subnet-02521eb45700f5398]
+aws_default_security_group.def_sg: Refreshing state... [id=sg-084a86c98ad8c2128]
+aws_route_table.ex4_rt: Refreshing state... [id=rtb-0667e7f44e185c197]
+aws_instance.ex4_other: Refreshing state... [id=i-027f0cb1638fd711c]
+aws_instance.ex4_jump: Refreshing state... [id=i-0e2bdac3c56bd21e5]
+aws_instance.ex4_web: Refreshing state... [id=i-023b492515018c825]
+aws_route_table_association.rt2public: Refreshing state... [id=rtbassoc-03399492da585a8f6]
+
+An execution plan has been generated and is shown below.
+Resource actions are indicated with the following symbols:
+  + create
+
+Terraform will perform the following actions:
+
+  # aws_eip.ex4_eip will be created
+  + resource "aws_eip" "ex4_eip" {
+      + allocation_id     = (known after apply)
+      + association_id    = (known after apply)
+      + domain            = (known after apply)
+      + id                = (known after apply)
+      + instance          = "i-023b492515018c825"
+      + network_interface = (known after apply)
+      + private_dns       = (known after apply)
+      + private_ip        = (known after apply)
+      + public_dns        = (known after apply)
+      + public_ip         = (known after apply)
+      + public_ipv4_pool  = (known after apply)
+      + vpc               = true
+    }
+
+  # aws_network_interface.ex4_eni will be created
+  + resource "aws_network_interface" "ex4_eni" {
+      + id                = (known after apply)
+      + mac_address       = (known after apply)
+      + private_dns_name  = (known after apply)
+      + private_ip        = (known after apply)
+      + private_ips       = (known after apply)
+      + private_ips_count = (known after apply)
+      + security_groups   = (known after apply)
+      + source_dest_check = true
+      + subnet_id         = "subnet-02521eb45700f5398"
+
+      + attachment {
+          + attachment_id = (known after apply)
+          + device_index  = 1
+          + instance      = "i-0e2bdac3c56bd21e5"
+        }
+    }
+
+Plan: 2 to add, 0 to change, 0 to destroy.
+
+Do you want to perform these actions?
+  Terraform will perform the actions described above.
+  Only 'yes' will be accepted to approve.
+
+  Enter a value: yes
+
+aws_network_interface.ex4_eni: Creating...
+aws_eip.ex4_eip: Creating...
+aws_eip.ex4_eip: Creation complete after 2s [id=eipalloc-09fb621227a1fdf29]
+
+Error: Error attaching ENI: InvalidParameterCombination: You may not attach a network interface to an instance if they are not in the same availability zone
+        status code: 400, request id: 84beded7-e835-4564-98db-eac284e18e1a
+
+  on vni.tf line 214, in resource "aws_network_interface" "ex4_eni":
+ 214: resource "aws_network_interface" "ex4_eni" {
+
+
+```
+
+So that did not work.
+The public and private subnets are in different availability zones,
+and thus the ENI connected to the private subnet cannot be associated
+with the jump host running in another availability zone.
+
+First I want to see what Terraform did:
+
+```
+$ terraform show
+# aws_default_security_group.def_sg:
+resource "aws_default_security_group" "def_sg" {
+    arn                    = "arn:aws:ec2:eu-central-1:143440624024:security-group/sg-084a86c98ad8c2128"
+    description            = "default VPC security group"
+    egress                 = [
+        {
+            cidr_blocks      = [
+                "0.0.0.0/0",
+            ]
+            description      = "Allow Internet access for, e.g., updates"
+            from_port        = 0
+            ipv6_cidr_blocks = []
+            prefix_list_ids  = []
+            protocol         = "-1"
+            security_groups  = []
+            self             = false
+            to_port          = 0
+        },
+    ]
+    id                     = "sg-084a86c98ad8c2128"
+    ingress                = [
+        {
+            cidr_blocks      = [
+                "0.0.0.0/0",
+            ]
+            description      = "Allow HTTP from the Internet"
+            from_port        = 80
+            ipv6_cidr_blocks = []
+            prefix_list_ids  = []
+            protocol         = "tcp"
+            security_groups  = []
+            self             = false
+            to_port          = 80
+        },
+        {
+            cidr_blocks      = [
+                "0.0.0.0/0",
+            ]
+            description      = "Allow HTTPS from the Internet"
+            from_port        = 443
+            ipv6_cidr_blocks = []
+            prefix_list_ids  = []
+            protocol         = "tcp"
+            security_groups  = []
+            self             = false
+            to_port          = 443
+        },
+        {
+            cidr_blocks      = [
+                "0.0.0.0/0",
+            ]
+            description      = "Allow SSH from the Internet"
+            from_port        = 22
+            ipv6_cidr_blocks = []
+            prefix_list_ids  = []
+            protocol         = "tcp"
+            security_groups  = []
+            self             = false
+            to_port          = 22
+        },
+        {
+            cidr_blocks      = []
+            description      = "Allow everything inside the SG"
+            from_port        = 0
+            ipv6_cidr_blocks = []
+            prefix_list_ids  = []
+            protocol         = "-1"
+            security_groups  = []
+            self             = true
+            to_port          = 0
+        },
+    ]
+    name                   = "default"
+    owner_id               = "143440624024"
+    revoke_rules_on_delete = false
+    tags                   = {
+        "Name" = "Ex. 4 default Security Group"
+    }
+    vpc_id                 = "vpc-0b508a704edb473cb"
+}
+
+# aws_eip.ex4_eip:
+resource "aws_eip" "ex4_eip" {
+    association_id    = "eipassoc-024cd5cb03c0a20dc"
+    domain            = "vpc"
+    id                = "eipalloc-09fb621227a1fdf29"
+    instance          = "i-023b492515018c825"
+    network_interface = "eni-0b0c13a8df17bd2ad"
+    private_dns       = "ip-10-42-255-153.eu-central-1.compute.internal"
+    private_ip        = "10.42.255.153"
+    public_dns        = "ec2-3-127-94-209.eu-central-1.compute.amazonaws.com"
+    public_ip         = "3.127.94.209"
+    public_ipv4_pool  = "amazon"
+    vpc               = true
+}
+
+# aws_instance.ex4_jump:
+resource "aws_instance" "ex4_jump" {
+    ami                          = "ami-0e342d72b12109f91"
+    arn                          = "arn:aws:ec2:eu-central-1:143440624024:instance/i-0e2bdac3c56bd21e5"
+    associate_public_ip_address  = true
+    availability_zone            = "eu-central-1a"
+    cpu_core_count               = 1
+    cpu_threads_per_core         = 1
+    disable_api_termination      = false
+    ebs_optimized                = false
+    get_password_data            = false
+    hibernation                  = false
+    id                           = "i-0e2bdac3c56bd21e5"
+    instance_state               = "running"
+    instance_type                = "t2.micro"
+    ipv6_address_count           = 0
+    ipv6_addresses               = []
+    key_name                     = "tf-pubcloud2020"
+    monitoring                   = false
+    primary_network_interface_id = "eni-042766ede1486ffdb"
+    private_dns                  = "ip-10-42-255-147.eu-central-1.compute.internal"
+    private_ip                   = "10.42.255.147"
+    public_dns                   = "ec2-18-185-67-143.eu-central-1.compute.amazonaws.com"
+    public_ip                    = "18.185.67.143"
+    security_groups              = []
+    source_dest_check            = true
+    subnet_id                    = "subnet-07a2d8e446b100c58"
+    tags                         = {
+        "Name" = "Ex. 4 jump host"
+    }
+    tenancy                      = "default"
+    user_data                    = "9ed191a9e90b29779765efa9828c23574c1d97a7"
+    volume_tags                  = {}
+    vpc_security_group_ids       = [
+        "sg-084a86c98ad8c2128",
+    ]
+
+    credit_specification {
+        cpu_credits = "standard"
+    }
+
+    root_block_device {
+        delete_on_termination = true
+        encrypted             = false
+        iops                  = 100
+        volume_id             = "vol-07f92581bbad1b864"
+        volume_size           = 8
+        volume_type           = "gp2"
+    }
+}
+
+# aws_instance.ex4_other:
+resource "aws_instance" "ex4_other" {
+    ami                          = "ami-0e342d72b12109f91"
+    arn                          = "arn:aws:ec2:eu-central-1:143440624024:instance/i-027f0cb1638fd711c"
+    associate_public_ip_address  = false
+    availability_zone            = "eu-central-1c"
+    cpu_core_count               = 1
+    cpu_threads_per_core         = 1
+    disable_api_termination      = false
+    ebs_optimized                = false
+    get_password_data            = false
+    hibernation                  = false
+    id                           = "i-027f0cb1638fd711c"
+    instance_state               = "running"
+    instance_type                = "t2.micro"
+    ipv6_address_count           = 0
+    ipv6_addresses               = []
+    key_name                     = "tf-pubcloud2020"
+    monitoring                   = false
+    primary_network_interface_id = "eni-005036578823f5482"
+    private_dns                  = "ip-10-42-0-143.eu-central-1.compute.internal"
+    private_ip                   = "10.42.0.143"
+    security_groups              = []
+    source_dest_check            = true
+    subnet_id                    = "subnet-02521eb45700f5398"
+    tags                         = {
+        "Name" = "Ex. 4 private host"
+    }
+    tenancy                      = "default"
+    user_data                    = "455b01c87a20b41630a012c794e4d53d8cda1d75"
+    volume_tags                  = {}
+    vpc_security_group_ids       = [
+        "sg-084a86c98ad8c2128",
+    ]
+
+    credit_specification {
+        cpu_credits = "standard"
+    }
+
+    root_block_device {
+        delete_on_termination = true
+        encrypted             = false
+        iops                  = 100
+        volume_id             = "vol-04c5697e3ac46667b"
+        volume_size           = 8
+        volume_type           = "gp2"
+    }
+}
+
+# aws_instance.ex4_web:
+resource "aws_instance" "ex4_web" {
+    ami                          = "ami-0e342d72b12109f91"
+    arn                          = "arn:aws:ec2:eu-central-1:143440624024:instance/i-023b492515018c825"
+    associate_public_ip_address  = true
+    availability_zone            = "eu-central-1a"
+    cpu_core_count               = 1
+    cpu_threads_per_core         = 1
+    disable_api_termination      = false
+    ebs_optimized                = false
+    get_password_data            = false
+    hibernation                  = false
+    id                           = "i-023b492515018c825"
+    instance_state               = "running"
+    instance_type                = "t2.micro"
+    ipv6_address_count           = 0
+    ipv6_addresses               = []
+    key_name                     = "tf-pubcloud2020"
+    monitoring                   = false
+    primary_network_interface_id = "eni-0b0c13a8df17bd2ad"
+    private_dns                  = "ip-10-42-255-153.eu-central-1.compute.internal"
+    private_ip                   = "10.42.255.153"
+    public_dns                   = "ec2-54-93-244-69.eu-central-1.compute.amazonaws.com"
+    public_ip                    = "54.93.244.69"
+    security_groups              = []
+    source_dest_check            = true
+    subnet_id                    = "subnet-07a2d8e446b100c58"
+    tags                         = {
+        "Name" = "Ex. 4 web server"
+    }
+    tenancy                      = "default"
+    user_data                    = "6197aaec194f10c08caf60960ec297a41f695ad2"
+    volume_tags                  = {}
+    vpc_security_group_ids       = [
+        "sg-084a86c98ad8c2128",
+    ]
+
+    credit_specification {
+        cpu_credits = "standard"
+    }
+
+    root_block_device {
+        delete_on_termination = true
+        encrypted             = false
+        iops                  = 100
+        volume_id             = "vol-0bd92088d60c8dceb"
+        volume_size           = 8
+        volume_type           = "gp2"
+    }
+}
+
+# aws_internet_gateway.ex4_igw:
+resource "aws_internet_gateway" "ex4_igw" {
+    id       = "igw-0f441755d966d38af"
+    owner_id = "143440624024"
+    tags     = {
+        "Name" = "Ex. 4 Internet gateway"
+    }
+    vpc_id   = "vpc-0b508a704edb473cb"
+}
+
+# aws_key_pair.course_ssh_key:
+resource "aws_key_pair" "course_ssh_key" {
+    fingerprint = "bc:c0:ba:de:c1:2d:a8:38:5d:08:33:ba:dd:18:db:c4"
+    id          = "tf-pubcloud2020"
+    key_name    = "tf-pubcloud2020"
+    key_pair_id = "key-04b1f0783a9f3db00"
+    public_key  = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDDiXuVGxn6zqLCPKbcojNC813FAnOPBWToBz/XTQaMzMsoAeKMRwVrUoyHEVj8UTFiuEUbTz/0jHItv5ZmFXI1DNY1m+hXxCDVcBp8ojCutX3+AJ012qG2PIZaloaYCjrTkhHj9VmMHAl1jzJ0EbPsoU/Qc4pZCNUNaCVCkG6EHisOUy9wx20i4gA/nrDnjIxk9TD2mGdlVCK7SESH/vGWgMtU6fLI65trtC4eojPNNUyMq8tTLyJxoTdYEwMY5alKkcjjw6+yVBOrtYgZSlMW02WLTkJT7eCxwVHig8a+bywiwAxuvYlUgfmOHEGEIXXTGk/+KNiLrDXdmkK4kuUvlf6rD7qR/kedqQAt0k5v/PiW3ufpej7n1ZBZroSsBT/0Yp5UcCLxpzskUYu+TRLRp+6gI50KsNe/oT8tesNtOVTK2ePD4eXApXAYwQpXy1389c4gGgh4wWljmHyeoFjcd4Soq847/PNspRdswR/u5jyswTsCROKsCJ4+whJRme8JoqaZHGBTpTu9n6gaZJVXbFM/55RYh0bpuCD5BHrdk0+HX4BmhJ1KqdDTDR84y2riwlpv6Eiw8AX8N2GVLOpP6RMt/AUCNUEy5nPWJosKb+UQE/j1dRJ9iorm2EGbh30dv/nRCb2Cu7BVyNWbmSrVaKdJub28SfV5L51sd+ATBw== auerswald@short"
+    tags        = {}
+}
+
+# aws_network_interface.ex4_eni: (tainted)
+resource "aws_network_interface" "ex4_eni" {
+    id = "eni-044cff70e2285fc5d"
+}
+
+# aws_route_table.ex4_rt:
+resource "aws_route_table" "ex4_rt" {
+    id               = "rtb-0667e7f44e185c197"
+    owner_id         = "143440624024"
+    propagating_vgws = []
+    route            = [
+        {
+            cidr_block                = "0.0.0.0/0"
+            egress_only_gateway_id    = ""
+            gateway_id                = "igw-0f441755d966d38af"
+            instance_id               = ""
+            ipv6_cidr_block           = ""
+            nat_gateway_id            = ""
+            network_interface_id      = ""
+            transit_gateway_id        = ""
+            vpc_peering_connection_id = ""
+        },
+    ]
+    tags             = {
+        "Name" = "Ex. 4 route table for Internet access"
+    }
+    vpc_id           = "vpc-0b508a704edb473cb"
+}
+
+# aws_route_table_association.rt2public:
+resource "aws_route_table_association" "rt2public" {
+    id             = "rtbassoc-03399492da585a8f6"
+    route_table_id = "rtb-0667e7f44e185c197"
+    subnet_id      = "subnet-07a2d8e446b100c58"
+}
+
+# aws_subnet.ex4_private:
+resource "aws_subnet" "ex4_private" {
+    arn                             = "arn:aws:ec2:eu-central-1:143440624024:subnet/subnet-02521eb45700f5398"
+    assign_ipv6_address_on_creation = false
+    availability_zone               = "eu-central-1c"
+    availability_zone_id            = "euc1-az1"
+    cidr_block                      = "10.42.0.0/24"
+    id                              = "subnet-02521eb45700f5398"
+    map_public_ip_on_launch         = false
+    owner_id                        = "143440624024"
+    tags                            = {
+        "Name" = "Ex. 4 private subnet"
+    }
+    vpc_id                          = "vpc-0b508a704edb473cb"
+}
+
+# aws_subnet.ex4_public:
+resource "aws_subnet" "ex4_public" {
+    arn                             = "arn:aws:ec2:eu-central-1:143440624024:subnet/subnet-07a2d8e446b100c58"
+    assign_ipv6_address_on_creation = false
+    availability_zone               = "eu-central-1a"
+    availability_zone_id            = "euc1-az2"
+    cidr_block                      = "10.42.255.0/24"
+    id                              = "subnet-07a2d8e446b100c58"
+    map_public_ip_on_launch         = true
+    owner_id                        = "143440624024"
+    tags                            = {
+        "Name" = "Ex. 4 public subnet"
+    }
+    vpc_id                          = "vpc-0b508a704edb473cb"
+}
+
+# aws_vpc.ex4_vpc:
+resource "aws_vpc" "ex4_vpc" {
+    arn                              = "arn:aws:ec2:eu-central-1:143440624024:vpc/vpc-0b508a704edb473cb"
+    assign_generated_ipv6_cidr_block = false
+    cidr_block                       = "10.42.0.0/16"
+    default_network_acl_id           = "acl-09e1365852f2f4dfd"
+    default_route_table_id           = "rtb-0322e2794276fc538"
+    default_security_group_id        = "sg-084a86c98ad8c2128"
+    dhcp_options_id                  = "dopt-983cf3f2"
+    enable_dns_hostnames             = true
+    enable_dns_support               = true
+    id                               = "vpc-0b508a704edb473cb"
+    instance_tenancy                 = "default"
+    main_route_table_id              = "rtb-0322e2794276fc538"
+    owner_id                         = "143440624024"
+    tags                             = {
+        "Name" = "Ex. 4 VPC"
+    }
+}
+
+# data.aws_ami.gnu_linux_image:
+data "aws_ami" "gnu_linux_image" {
+    architecture          = "x86_64"
+    block_device_mappings = [
+        {
+            device_name  = "/dev/sda1"
+            ebs          = {
+                "delete_on_termination" = "true"
+                "encrypted"             = "false"
+                "iops"                  = "0"
+                "snapshot_id"           = "snap-04380c2d33633ce33"
+                "volume_size"           = "8"
+                "volume_type"           = "gp2"
+            }
+            no_device    = ""
+            virtual_name = ""
+        },
+        {
+            device_name  = "/dev/sdb"
+            ebs          = {}
+            no_device    = ""
+            virtual_name = "ephemeral0"
+        },
+        {
+            device_name  = "/dev/sdc"
+            ebs          = {}
+            no_device    = ""
+            virtual_name = "ephemeral1"
+        },
+    ]
+    creation_date         = "2020-04-09T16:44:38.000Z"
+    description           = "Canonical, Ubuntu, 18.04 LTS, amd64 bionic image build on 2020-04-08"
+    hypervisor            = "xen"
+    id                    = "ami-0e342d72b12109f91"
+    image_id              = "ami-0e342d72b12109f91"
+    image_location        = "099720109477/ubuntu/images/hvm-ssd/ubuntu-bionic-18.04-amd64-server-20200408"
+    image_type            = "machine"
+    most_recent           = true
+    name                  = "ubuntu/images/hvm-ssd/ubuntu-bionic-18.04-amd64-server-20200408"
+    owner_id              = "099720109477"
+    owners                = [
+        "099720109477",
+    ]
+    product_codes         = []
+    public                = true
+    root_device_name      = "/dev/sda1"
+    root_device_type      = "ebs"
+    root_snapshot_id      = "snap-04380c2d33633ce33"
+    sriov_net_support     = "simple"
+    state                 = "available"
+    state_reason          = {
+        "code"    = "UNSET"
+        "message" = "UNSET"
+    }
+    tags                  = {}
+    virtualization_type   = "hvm"
+
+    filter {
+        name   = "name"
+        values = [
+            "ubuntu/images/hvm-ssd/ubuntu-*-18.04-amd64-server-????????",
+        ]
+    }
+    filter {
+        name   = "state"
+        values = [
+            "available",
+        ]
+    }
+}
+
+
+Outputs:
+
+VPC_prefix = "10.42.0.0/16"
+eip_ip = "3.127.94.209"
+eip_name = "ec2-3-127-94-209.eu-central-1.compute.amazonaws.com"
+eip_private_ip = "10.42.255.153"
+eip_private_name = "ip-10-42-255-153.eu-central-1.compute.internal"
+jump_host_ip = "18.185.67.143"
+jump_host_name = "ec2-18-185-67-143.eu-central-1.compute.amazonaws.com"
+jump_host_privat_ip = "10.42.255.147"
+jump_host_privat_name = "ip-10-42-255-147.eu-central-1.compute.internal"
+private_host_ip = "10.42.0.143"
+private_host_name = "ip-10-42-0-143.eu-central-1.compute.internal"
+private_subnet_prefix = "10.42.0.0/24"
+public_subnet_prefix = "10.42.255.0/24"
+web_server_ip = "54.93.244.69"
+web_server_name = "ec2-54-93-244-69.eu-central-1.compute.amazonaws.com"
+web_server_private_ip = "10.42.255.153"
+web_server_private_name = "ip-10-42-255-153.eu-central-1.compute.internal"
+```
+
+So the EIP was created and associated.
+It can be used to access the web server:
+
+```
+$ lynx -dump 3.127.94.209
+          PubCloud 2020 - Exercise 4 - Virtual Network Infrastructure
+
+   This website is part of my solution to hands-on exercise 4 of the
+   [1]Networking in Public Cloud Deployments course in the spring of 2020.
+
+   This request was served from host ip-10-42-255-153 with local IP
+   address 10.42.255.153 in availability zone eu-central-1a of region
+   eu-central-1.
+
+References
+
+   1. https://www.ipspace.net/PubCloud/
+$ lynx -dump ec2-3-127-94-209.eu-central-1.compute.amazonaws.com
+          PubCloud 2020 - Exercise 4 - Virtual Network Infrastructure
+
+   This website is part of my solution to hands-on exercise 4 of the
+   [1]Networking in Public Cloud Deployments course in the spring of 2020.
+
+   This request was served from host ip-10-42-255-153 with local IP
+   address 10.42.255.153 in availability zone eu-central-1a of region
+   eu-central-1.
+
+References
+
+   1. https://www.ipspace.net/PubCloud/
+```
+
+The IP address reported for the web server no longer provides access,
+as described in the Terraform documentation:
+
+```
+$ timeout 10 lynx -dump 54.93.244.69
+
+
+Exiting via interrupt: 15
+
+$ timeout 10 lynx -dump ec2-54-93-244-69.eu-central-1.compute.amazonaws.com
+
+
+Exiting via interrupt: 15
+
+```
+
+The ENI was created as well, but not exactly as intended.
+It is marked as *tainted*:
+
+```
+$ terraform show | section ex4_eni
+# aws_network_interface.ex4_eni: (tainted)
+resource "aws_network_interface" "ex4_eni" {
+    id = "eni-044cff70e2285fc5d"
+```
+
+I will try and change the ENI to attach to the public subnet.
+Thus it should be able to be attached to the jump host,
+if two network interfaces on the same subnet are accepted:
+
+```
+$ terraform validate
+Success! The configuration is valid.
+
+$ terraform apply
+aws_vpc.ex4_vpc: Refreshing state... [id=vpc-0b508a704edb473cb]
+aws_key_pair.course_ssh_key: Refreshing state... [id=tf-pubcloud2020]
+data.aws_ami.gnu_linux_image: Refreshing state...
+aws_internet_gateway.ex4_igw: Refreshing state... [id=igw-0f441755d966d38af]
+aws_subnet.ex4_private: Refreshing state... [id=subnet-02521eb45700f5398]
+aws_subnet.ex4_public: Refreshing state... [id=subnet-07a2d8e446b100c58]
+aws_default_security_group.def_sg: Refreshing state... [id=sg-084a86c98ad8c2128]
+aws_route_table.ex4_rt: Refreshing state... [id=rtb-0667e7f44e185c197]
+aws_instance.ex4_other: Refreshing state... [id=i-027f0cb1638fd711c]
+aws_instance.ex4_jump: Refreshing state... [id=i-0e2bdac3c56bd21e5]
+aws_instance.ex4_web: Refreshing state... [id=i-023b492515018c825]
+aws_route_table_association.rt2public: Refreshing state... [id=rtbassoc-03399492da585a8f6]
+aws_eip.ex4_eip: Refreshing state... [id=eipalloc-09fb621227a1fdf29]
+aws_network_interface.ex4_eni: Refreshing state... [id=eni-044cff70e2285fc5d]
+
+An execution plan has been generated and is shown below.
+Resource actions are indicated with the following symbols:
+-/+ destroy and then create replacement
+
+Terraform will perform the following actions:
+
+  # aws_network_interface.ex4_eni is tainted, so must be replaced
+-/+ resource "aws_network_interface" "ex4_eni" {
+      ~ id                = "eni-044cff70e2285fc5d" -> (known after apply)
+      ~ mac_address       = "0a:6b:8c:b6:d5:8e" -> (known after apply)
+      ~ private_dns_name  = "ip-10-42-0-91.eu-central-1.compute.internal" -> (known after apply)
+      ~ private_ip        = "10.42.0.91" -> (known after apply)
+      ~ private_ips       = [
+          - "10.42.0.91",
+        ] -> (known after apply)
+      ~ private_ips_count = 0 -> (known after apply)
+      ~ security_groups   = [
+          - "sg-084a86c98ad8c2128",
+        ] -> (known after apply)
+        source_dest_check = true
+      ~ subnet_id         = "subnet-02521eb45700f5398" -> "subnet-07a2d8e446b100c58"
+      - tags              = {} -> null
+
+      + attachment {
+          + attachment_id = (known after apply)
+          + device_index  = 1
+          + instance      = "i-0e2bdac3c56bd21e5"
+        }
+    }
+
+Plan: 1 to add, 0 to change, 1 to destroy.
+
+Do you want to perform these actions?
+  Terraform will perform the actions described above.
+  Only 'yes' will be accepted to approve.
+
+  Enter a value: yes
+
+aws_network_interface.ex4_eni: Destroying... [id=eni-044cff70e2285fc5d]
+aws_network_interface.ex4_eni: Destruction complete after 1s
+aws_network_interface.ex4_eni: Creating...
+aws_network_interface.ex4_eni: Creation complete after 3s [id=eni-0932f51530cb1ea79]
+
+Apply complete! Resources: 1 added, 0 changed, 1 destroyed.
+
+Outputs:
+
+VPC_prefix = 10.42.0.0/16
+eip_ip = 3.127.94.209
+eip_name = ec2-3-127-94-209.eu-central-1.compute.amazonaws.com
+eip_private_ip = 10.42.255.153
+eip_private_name = ip-10-42-255-153.eu-central-1.compute.internal
+eni_private_ip = 10.42.255.40
+jump_host_ip = 18.185.67.143
+jump_host_name = ec2-18-185-67-143.eu-central-1.compute.amazonaws.com
+jump_host_privat_ip = 10.42.255.147
+jump_host_privat_name = ip-10-42-255-147.eu-central-1.compute.internal
+private_host_ip = 10.42.0.143
+private_host_name = ip-10-42-0-143.eu-central-1.compute.internal
+private_subnet_prefix = 10.42.0.0/24
+public_subnet_prefix = 10.42.255.0/24
+web_server_ip = 3.127.94.209
+web_server_name = ec2-3-127-94-209.eu-central-1.compute.amazonaws.com
+web_server_private_ip = 10.42.255.153
+web_server_private_name = ip-10-42-255-153.eu-central-1.compute.internal
+```
+
+So Terraform *replaced* the ENI,
+because of the *tainted* status.
+The ENI is attached to the jump host
+and a private IP address is associated,
+but the Ubuntu 18.04 image does not activate it automatically:
+
+```
+$ ssh ubuntu@ec2-18-185-67-143.eu-central-1.compute.amazonaws.com ip a
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host
+       valid_lft forever preferred_lft forever
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9001 qdisc fq_codel state UP group default qlen 1000
+    link/ether 02:c8:4a:c6:fa:9c brd ff:ff:ff:ff:ff:ff
+    inet 10.42.255.147/24 brd 10.42.255.255 scope global dynamic eth0
+       valid_lft 2611sec preferred_lft 2611sec
+    inet6 fe80::c8:4aff:fec6:fa9c/64 scope link
+       valid_lft forever preferred_lft forever
+3: eth1: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN group default qlen 1000
+    link/ether 02:b9:70:99:c0:60 brd ff:ff:ff:ff:ff:ff
+```
+
+Activating the interface manually results in broken external
+connectivity to the jump host:
+
+```
+$ ssh ubuntu@ec2-18-185-67-143.eu-central-1.compute.amazonaws.com 
+Welcome to Ubuntu 18.04.4 LTS (GNU/Linux 4.15.0-1065-aws x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/advantage
+
+  System information as of Sun Apr 26 16:45:53 UTC 2020
+
+  System load:  0.0               Processes:           89
+  Usage of /:   16.0% of 7.69GB   Users logged in:     0
+  Memory usage: 16%               IP address for eth0: 10.42.255.147
+  Swap usage:   0%
+
+
+0 packages can be updated.
+0 updates are security updates.
+
+
+Last login: Sun Apr 26 16:44:16 2020 from 46.114.1.35
+To run a command as administrator (user "root"), use "sudo <command>".
+See "man sudo_root" for details.
+
+ubuntu@ip-10-42-255-147:~$ sudo ip link set dev eth1 up
+ubuntu@ip-10-42-255-147:~$ sudo dhclient eth1
+
+```
+
+I can log into the jump host via the web server and disable `eth`:
+
+```
+$ ssh -o ProxyJump=ubuntu@3.127.94.209 ubuntu@10.42.255.147
+Welcome to Ubuntu 18.04.4 LTS (GNU/Linux 4.15.0-1065-aws x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/advantage
+
+  System information as of Sun Apr 26 16:50:04 UTC 2020
+
+  System load:  0.0               Processes:           91
+  Usage of /:   16.0% of 7.69GB   Users logged in:     1
+  Memory usage: 17%               IP address for eth0: 10.42.255.147
+  Swap usage:   0%                IP address for eth1: 10.42.255.40
+
+
+0 packages can be updated.
+0 updates are security updates.
+
+
+Last login: Sun Apr 26 16:48:07 2020 from 10.42.255.153
+$ sudo ip link set dev eth1 down
+```
+
+Then the original, direct SSH connection to the jump host recovers:
+
+```
+cmp: EOF on /tmp/tmp.NA95aqZOYQ which is empty
+ubuntu@ip-10-42-255-147:~$
+ubuntu@ip-10-42-255-147:~$
+ubuntu@ip-10-42-255-147:~$ ip a
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host
+       valid_lft forever preferred_lft forever
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9001 qdisc fq_codel state UP group default qlen 1000
+    link/ether 02:c8:4a:c6:fa:9c brd ff:ff:ff:ff:ff:ff
+    inet 10.42.255.147/24 brd 10.42.255.255 scope global dynamic eth0
+       valid_lft 2003sec preferred_lft 2003sec
+    inet6 fe80::c8:4aff:fec6:fa9c/64 scope link
+       valid_lft forever preferred_lft forever
+3: eth1: <BROADCAST,MULTICAST> mtu 9001 qdisc fq_codel state DOWN group default qlen 1000
+    link/ether 02:b9:70:99:c0:60 brd ff:ff:ff:ff:ff:ff
+    inet 10.42.255.40/24 brd 10.42.255.255 scope global eth1
+       valid_lft forever preferred_lft forever
+```
+
+I'd say I would need another subnet in the same availability
+zone as the public one
+to use the ENI.
+I'd rather remove it from the configuration,
+since I do not really need it:
+
+```
+$ terraform validate
+Success! The configuration is valid.
+
+$ terraform apply
+aws_vpc.ex4_vpc: Refreshing state... [id=vpc-0b508a704edb473cb]
+aws_network_interface.ex4_eni: Refreshing state... [id=eni-0932f51530cb1ea79]
+data.aws_ami.gnu_linux_image: Refreshing state...
+aws_key_pair.course_ssh_key: Refreshing state... [id=tf-pubcloud2020]
+aws_subnet.ex4_public: Refreshing state... [id=subnet-07a2d8e446b100c58]
+aws_internet_gateway.ex4_igw: Refreshing state... [id=igw-0f441755d966d38af]
+aws_subnet.ex4_private: Refreshing state... [id=subnet-02521eb45700f5398]
+aws_default_security_group.def_sg: Refreshing state... [id=sg-084a86c98ad8c2128]
+aws_route_table.ex4_rt: Refreshing state... [id=rtb-0667e7f44e185c197]
+aws_instance.ex4_web: Refreshing state... [id=i-023b492515018c825]
+aws_instance.ex4_jump: Refreshing state... [id=i-0e2bdac3c56bd21e5]
+aws_instance.ex4_other: Refreshing state... [id=i-027f0cb1638fd711c]
+aws_route_table_association.rt2public: Refreshing state... [id=rtbassoc-03399492da585a8f6]
+aws_eip.ex4_eip: Refreshing state... [id=eipalloc-09fb621227a1fdf29]
+
+An execution plan has been generated and is shown below.
+Resource actions are indicated with the following symbols:
+  - destroy
+
+Terraform will perform the following actions:
+
+  # aws_network_interface.ex4_eni will be destroyed
+  - resource "aws_network_interface" "ex4_eni" {
+      - id                = "eni-0932f51530cb1ea79" -> null
+      - mac_address       = "02:b9:70:99:c0:60" -> null
+      - private_dns_name  = "ip-10-42-255-40.eu-central-1.compute.internal" -> null
+      - private_ip        = "10.42.255.40" -> null
+      - private_ips       = [
+          - "10.42.255.40",
+        ] -> null
+      - private_ips_count = 0 -> null
+      - security_groups   = [
+          - "sg-084a86c98ad8c2128",
+        ] -> null
+      - source_dest_check = true -> null
+      - subnet_id         = "subnet-07a2d8e446b100c58" -> null
+      - tags              = {} -> null
+
+      - attachment {
+          - attachment_id = "eni-attach-03f9fcab4385ae527" -> null
+          - device_index  = 1 -> null
+          - instance      = "i-0e2bdac3c56bd21e5" -> null
+        }
+    }
+
+Plan: 0 to add, 0 to change, 1 to destroy.
+
+Do you want to perform these actions?
+  Terraform will perform the actions described above.
+  Only 'yes' will be accepted to approve.
+
+  Enter a value: yes
+
+aws_network_interface.ex4_eni: Destroying... [id=eni-0932f51530cb1ea79]
+aws_network_interface.ex4_eni: Still destroying... [id=eni-0932f51530cb1ea79, 10s elapsed]
+aws_network_interface.ex4_eni: Destruction complete after 14s
+
+Apply complete! Resources: 0 added, 0 changed, 1 destroyed.
+
+Outputs:
+
+VPC_prefix = 10.42.0.0/16
+eip_ip = 3.127.94.209
+eip_name = ec2-3-127-94-209.eu-central-1.compute.amazonaws.com
+eip_private_ip = 10.42.255.153
+eip_private_name = ip-10-42-255-153.eu-central-1.compute.internal
+jump_host_ip = 18.185.67.143
+jump_host_name = ec2-18-185-67-143.eu-central-1.compute.amazonaws.com
+jump_host_privat_ip = 10.42.255.147
+jump_host_privat_name = ip-10-42-255-147.eu-central-1.compute.internal
+private_host_ip = 10.42.0.143
+private_host_name = ip-10-42-0-143.eu-central-1.compute.internal
+private_subnet_prefix = 10.42.0.0/24
+public_subnet_prefix = 10.42.255.0/24
+web_server_ip = 3.127.94.209
+web_server_name = ec2-3-127-94-209.eu-central-1.compute.amazonaws.com
+web_server_private_ip = 10.42.255.153
+web_server_private_name = ip-10-42-255-153.eu-central-1.compute.internal
+```
+
+### Automating the Connectivity Tests
+
+I want to write a Bash script to perform the connectivity tests.
+The idea is to read the EC2 instance addresses from the
+Terraform state file,
+and fail the script on the first test failure.
+That is not great,
+but provides a quick and dirty solution
+that is better than performing the tests manually.
+The shell script is named
+[connectivity\_test](connectivity_test).
+Using it looks as follows:
+
+```
+$ ./connectivity_test
+--> connecting to elastic IP address via IP address...
+Warning: Permanently added '3.127.94.209' (ECDSA) to the list of known hosts.
+--> OK
+--> connecting to elastic IP address via DNS name...
+Warning: Permanently added 'ec2-3-127-94-209.eu-central-1.compute.amazonaws.com,3.127.94.209' (ECDSA) to the list of known hosts.
+--> OK
+--> connecting to jump server via IP address...
+Warning: Permanently added '18.185.67.143' (ECDSA) to the list of known hosts.
+--> OK
+--> connecting to jump server via DNS name...
+Warning: Permanently added 'ec2-18-185-67-143.eu-central-1.compute.amazonaws.com,18.185.67.143' (ECDSA) to the list of known hosts.
+--> OK
+--> accessing web page via IP address...
+--> OK
+--> accessing web page via DNS name...
+--> OK
+--> connecting via jump host to host on private subnet...
+Warning: Permanently added '10.42.0.143' (ECDSA) to the list of known hosts.
+--> OK
+--> testing internal connectivity of host on private subnet...
+Warning: Permanently added '10.42.0.143' (ECDSA) to the list of known hosts.
+PING 10.42.255.153 (10.42.255.153) 56(84) bytes of data.
+64 bytes from 10.42.255.153: icmp_seq=1 ttl=64 time=0.885 ms
+64 bytes from 10.42.255.153: icmp_seq=2 ttl=64 time=0.940 ms
+
+--- 10.42.255.153 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1005ms
+rtt min/avg/max/mdev = 0.885/0.912/0.940/0.040 ms
+--> OK
+--> testing for no external connectivity of host on private subnet...
+Warning: Permanently added '10.42.0.143' (ECDSA) to the list of known hosts.
+PING 8.8.8.8 (8.8.8.8) 56(84) bytes of data.
+
+--- 8.8.8.8 ping statistics ---
+2 packets transmitted, 0 received, 100% packet loss, time 1003ms
+
+--> OK
+
+==> All tests passed successfully, :-)
+```
+
+This ain't great, but a start.
+It does show how connectivity *can* be tested, though.
+
+## Cleaning Up
+
+As always,
+I remove the Public Cloud infrastructure after the exercise:
+
+```
+$ terraform destroy
+aws_vpc.ex4_vpc: Refreshing state... [id=vpc-0b508a704edb473cb]
+aws_key_pair.course_ssh_key: Refreshing state... [id=tf-pubcloud2020]
+data.aws_ami.gnu_linux_image: Refreshing state...
+aws_internet_gateway.ex4_igw: Refreshing state... [id=igw-0f441755d966d38af]
+aws_default_security_group.def_sg: Refreshing state... [id=sg-084a86c98ad8c2128]
+aws_subnet.ex4_public: Refreshing state... [id=subnet-07a2d8e446b100c58]
+aws_subnet.ex4_private: Refreshing state... [id=subnet-02521eb45700f5398]
+aws_instance.ex4_other: Refreshing state... [id=i-027f0cb1638fd711c]
+aws_route_table.ex4_rt: Refreshing state... [id=rtb-0667e7f44e185c197]
+aws_instance.ex4_web: Refreshing state... [id=i-023b492515018c825]
+aws_instance.ex4_jump: Refreshing state... [id=i-0e2bdac3c56bd21e5]
+aws_route_table_association.rt2public: Refreshing state... [id=rtbassoc-03399492da585a8f6]
+aws_eip.ex4_eip: Refreshing state... [id=eipalloc-09fb621227a1fdf29]
+
+An execution plan has been generated and is shown below.
+Resource actions are indicated with the following symbols:
+  - destroy
+
+Terraform will perform the following actions:
+
+  # aws_default_security_group.def_sg will be destroyed
+  - resource "aws_default_security_group" "def_sg" {
+      - arn                    = "arn:aws:ec2:eu-central-1:143440624024:security-group/sg-084a86c98ad8c2128" -> null
+      - description            = "default VPC security group" -> null
+      - egress                 = [
+          - {
+              - cidr_blocks      = [
+                  - "0.0.0.0/0",
+                ]
+              - description      = "Allow Internet access for, e.g., updates"
+              - from_port        = 0
+              - ipv6_cidr_blocks = []
+              - prefix_list_ids  = []
+              - protocol         = "-1"
+              - security_groups  = []
+              - self             = false
+              - to_port          = 0
+            },
+        ] -> null
+      - id                     = "sg-084a86c98ad8c2128" -> null
+      - ingress                = [
+          - {
+              - cidr_blocks      = [
+                  - "0.0.0.0/0",
+                ]
+              - description      = "Allow HTTP from the Internet"
+              - from_port        = 80
+              - ipv6_cidr_blocks = []
+              - prefix_list_ids  = []
+              - protocol         = "tcp"
+              - security_groups  = []
+              - self             = false
+              - to_port          = 80
+            },
+          - {
+              - cidr_blocks      = [
+                  - "0.0.0.0/0",
+                ]
+              - description      = "Allow HTTPS from the Internet"
+              - from_port        = 443
+              - ipv6_cidr_blocks = []
+              - prefix_list_ids  = []
+              - protocol         = "tcp"
+              - security_groups  = []
+              - self             = false
+              - to_port          = 443
+            },
+          - {
+              - cidr_blocks      = [
+                  - "0.0.0.0/0",
+                ]
+              - description      = "Allow SSH from the Internet"
+              - from_port        = 22
+              - ipv6_cidr_blocks = []
+              - prefix_list_ids  = []
+              - protocol         = "tcp"
+              - security_groups  = []
+              - self             = false
+              - to_port          = 22
+            },
+          - {
+              - cidr_blocks      = []
+              - description      = "Allow everything inside the SG"
+              - from_port        = 0
+              - ipv6_cidr_blocks = []
+              - prefix_list_ids  = []
+              - protocol         = "-1"
+              - security_groups  = []
+              - self             = true
+              - to_port          = 0
+            },
+        ] -> null
+      - name                   = "default" -> null
+      - owner_id               = "143440624024" -> null
+      - revoke_rules_on_delete = false -> null
+      - tags                   = {
+          - "Name" = "Ex. 4 default Security Group"
+        } -> null
+      - vpc_id                 = "vpc-0b508a704edb473cb" -> null
+    }
+
+  # aws_eip.ex4_eip will be destroyed
+  - resource "aws_eip" "ex4_eip" {
+      - association_id    = "eipassoc-024cd5cb03c0a20dc" -> null
+      - domain            = "vpc" -> null
+      - id                = "eipalloc-09fb621227a1fdf29" -> null
+      - instance          = "i-023b492515018c825" -> null
+      - network_interface = "eni-0b0c13a8df17bd2ad" -> null
+      - private_dns       = "ip-10-42-255-153.eu-central-1.compute.internal" -> null
+      - private_ip        = "10.42.255.153" -> null
+      - public_dns        = "ec2-3-127-94-209.eu-central-1.compute.amazonaws.com" -> null
+      - public_ip         = "3.127.94.209" -> null
+      - public_ipv4_pool  = "amazon" -> null
+      - tags              = {} -> null
+      - vpc               = true -> null
+    }
+
+  # aws_instance.ex4_jump will be destroyed
+  - resource "aws_instance" "ex4_jump" {
+      - ami                          = "ami-0e342d72b12109f91" -> null
+      - arn                          = "arn:aws:ec2:eu-central-1:143440624024:instance/i-0e2bdac3c56bd21e5" -> null
+      - associate_public_ip_address  = true -> null
+      - availability_zone            = "eu-central-1a" -> null
+      - cpu_core_count               = 1 -> null
+      - cpu_threads_per_core         = 1 -> null
+      - disable_api_termination      = false -> null
+      - ebs_optimized                = false -> null
+      - get_password_data            = false -> null
+      - hibernation                  = false -> null
+      - id                           = "i-0e2bdac3c56bd21e5" -> null
+      - instance_state               = "running" -> null
+      - instance_type                = "t2.micro" -> null
+      - ipv6_address_count           = 0 -> null
+      - ipv6_addresses               = [] -> null
+      - key_name                     = "tf-pubcloud2020" -> null
+      - monitoring                   = false -> null
+      - primary_network_interface_id = "eni-042766ede1486ffdb" -> null
+      - private_dns                  = "ip-10-42-255-147.eu-central-1.compute.internal" -> null
+      - private_ip                   = "10.42.255.147" -> null
+      - public_dns                   = "ec2-18-185-67-143.eu-central-1.compute.amazonaws.com" -> null
+      - public_ip                    = "18.185.67.143" -> null
+      - security_groups              = [] -> null
+      - source_dest_check            = true -> null
+      - subnet_id                    = "subnet-07a2d8e446b100c58" -> null
+      - tags                         = {
+          - "Name" = "Ex. 4 jump host"
+        } -> null
+      - tenancy                      = "default" -> null
+      - user_data                    = "9ed191a9e90b29779765efa9828c23574c1d97a7" -> null
+      - volume_tags                  = {} -> null
+      - vpc_security_group_ids       = [
+          - "sg-084a86c98ad8c2128",
+        ] -> null
+
+      - credit_specification {
+          - cpu_credits = "standard" -> null
+        }
+
+      - root_block_device {
+          - delete_on_termination = true -> null
+          - encrypted             = false -> null
+          - iops                  = 100 -> null
+          - volume_id             = "vol-07f92581bbad1b864" -> null
+          - volume_size           = 8 -> null
+          - volume_type           = "gp2" -> null
+        }
+    }
+
+  # aws_instance.ex4_other will be destroyed
+  - resource "aws_instance" "ex4_other" {
+      - ami                          = "ami-0e342d72b12109f91" -> null
+      - arn                          = "arn:aws:ec2:eu-central-1:143440624024:instance/i-027f0cb1638fd711c" -> null
+      - associate_public_ip_address  = false -> null
+      - availability_zone            = "eu-central-1c" -> null
+      - cpu_core_count               = 1 -> null
+      - cpu_threads_per_core         = 1 -> null
+      - disable_api_termination      = false -> null
+      - ebs_optimized                = false -> null
+      - get_password_data            = false -> null
+      - hibernation                  = false -> null
+      - id                           = "i-027f0cb1638fd711c" -> null
+      - instance_state               = "running" -> null
+      - instance_type                = "t2.micro" -> null
+      - ipv6_address_count           = 0 -> null
+      - ipv6_addresses               = [] -> null
+      - key_name                     = "tf-pubcloud2020" -> null
+      - monitoring                   = false -> null
+      - primary_network_interface_id = "eni-005036578823f5482" -> null
+      - private_dns                  = "ip-10-42-0-143.eu-central-1.compute.internal" -> null
+      - private_ip                   = "10.42.0.143" -> null
+      - security_groups              = [] -> null
+      - source_dest_check            = true -> null
+      - subnet_id                    = "subnet-02521eb45700f5398" -> null
+      - tags                         = {
+          - "Name" = "Ex. 4 private host"
+        } -> null
+      - tenancy                      = "default" -> null
+      - user_data                    = "455b01c87a20b41630a012c794e4d53d8cda1d75" -> null
+      - volume_tags                  = {} -> null
+      - vpc_security_group_ids       = [
+          - "sg-084a86c98ad8c2128",
+        ] -> null
+
+      - credit_specification {
+          - cpu_credits = "standard" -> null
+        }
+
+      - root_block_device {
+          - delete_on_termination = true -> null
+          - encrypted             = false -> null
+          - iops                  = 100 -> null
+          - volume_id             = "vol-04c5697e3ac46667b" -> null
+          - volume_size           = 8 -> null
+          - volume_type           = "gp2" -> null
+        }
+    }
+
+  # aws_instance.ex4_web will be destroyed
+  - resource "aws_instance" "ex4_web" {
+      - ami                          = "ami-0e342d72b12109f91" -> null
+      - arn                          = "arn:aws:ec2:eu-central-1:143440624024:instance/i-023b492515018c825" -> null
+      - associate_public_ip_address  = true -> null
+      - availability_zone            = "eu-central-1a" -> null
+      - cpu_core_count               = 1 -> null
+      - cpu_threads_per_core         = 1 -> null
+      - disable_api_termination      = false -> null
+      - ebs_optimized                = false -> null
+      - get_password_data            = false -> null
+      - hibernation                  = false -> null
+      - id                           = "i-023b492515018c825" -> null
+      - instance_state               = "running" -> null
+      - instance_type                = "t2.micro" -> null
+      - ipv6_address_count           = 0 -> null
+      - ipv6_addresses               = [] -> null
+      - key_name                     = "tf-pubcloud2020" -> null
+      - monitoring                   = false -> null
+      - primary_network_interface_id = "eni-0b0c13a8df17bd2ad" -> null
+      - private_dns                  = "ip-10-42-255-153.eu-central-1.compute.internal" -> null
+      - private_ip                   = "10.42.255.153" -> null
+      - public_dns                   = "ec2-3-127-94-209.eu-central-1.compute.amazonaws.com" -> null
+      - public_ip                    = "3.127.94.209" -> null
+      - security_groups              = [] -> null
+      - source_dest_check            = true -> null
+      - subnet_id                    = "subnet-07a2d8e446b100c58" -> null
+      - tags                         = {
+          - "Name" = "Ex. 4 web server"
+        } -> null
+      - tenancy                      = "default" -> null
+      - user_data                    = "6197aaec194f10c08caf60960ec297a41f695ad2" -> null
+      - volume_tags                  = {} -> null
+      - vpc_security_group_ids       = [
+          - "sg-084a86c98ad8c2128",
+        ] -> null
+
+      - credit_specification {
+          - cpu_credits = "standard" -> null
+        }
+
+      - root_block_device {
+          - delete_on_termination = true -> null
+          - encrypted             = false -> null
+          - iops                  = 100 -> null
+          - volume_id             = "vol-0bd92088d60c8dceb" -> null
+          - volume_size           = 8 -> null
+          - volume_type           = "gp2" -> null
+        }
+    }
+
+  # aws_internet_gateway.ex4_igw will be destroyed
+  - resource "aws_internet_gateway" "ex4_igw" {
+      - id       = "igw-0f441755d966d38af" -> null
+      - owner_id = "143440624024" -> null
+      - tags     = {
+          - "Name" = "Ex. 4 Internet gateway"
+        } -> null
+      - vpc_id   = "vpc-0b508a704edb473cb" -> null
+    }
+
+  # aws_key_pair.course_ssh_key will be destroyed
+  - resource "aws_key_pair" "course_ssh_key" {
+      - fingerprint = "bc:c0:ba:de:c1:2d:a8:38:5d:08:33:ba:dd:18:db:c4" -> null
+      - id          = "tf-pubcloud2020" -> null
+      - key_name    = "tf-pubcloud2020" -> null
+      - key_pair_id = "key-04b1f0783a9f3db00" -> null
+      - public_key  = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDDiXuVGxn6zqLCPKbcojNC813FAnOPBWToBz/XTQaMzMsoAeKMRwVrUoyHEVj8UTFiuEUbTz/0jHItv5ZmFXI1DNY1m+hXxCDVcBp8ojCutX3+AJ012qG2PIZaloaYCjrTkhHj9VmMHAl1jzJ0EbPsoU/Qc4pZCNUNaCVCkG6EHisOUy9wx20i4gA/nrDnjIxk9TD2mGdlVCK7SESH/vGWgMtU6fLI65trtC4eojPNNUyMq8tTLyJxoTdYEwMY5alKkcjjw6+yVBOrtYgZSlMW02WLTkJT7eCxwVHig8a+bywiwAxuvYlUgfmOHEGEIXXTGk/+KNiLrDXdmkK4kuUvlf6rD7qR/kedqQAt0k5v/PiW3ufpej7n1ZBZroSsBT/0Yp5UcCLxpzskUYu+TRLRp+6gI50KsNe/oT8tesNtOVTK2ePD4eXApXAYwQpXy1389c4gGgh4wWljmHyeoFjcd4Soq847/PNspRdswR/u5jyswTsCROKsCJ4+whJRme8JoqaZHGBTpTu9n6gaZJVXbFM/55RYh0bpuCD5BHrdk0+HX4BmhJ1KqdDTDR84y2riwlpv6Eiw8AX8N2GVLOpP6RMt/AUCNUEy5nPWJosKb+UQE/j1dRJ9iorm2EGbh30dv/nRCb2Cu7BVyNWbmSrVaKdJub28SfV5L51sd+ATBw== auerswald@short" -> null
+      - tags        = {} -> null
+    }
+
+  # aws_route_table.ex4_rt will be destroyed
+  - resource "aws_route_table" "ex4_rt" {
+      - id               = "rtb-0667e7f44e185c197" -> null
+      - owner_id         = "143440624024" -> null
+      - propagating_vgws = [] -> null
+      - route            = [
+          - {
+              - cidr_block                = "0.0.0.0/0"
+              - egress_only_gateway_id    = ""
+              - gateway_id                = "igw-0f441755d966d38af"
+              - instance_id               = ""
+              - ipv6_cidr_block           = ""
+              - nat_gateway_id            = ""
+              - network_interface_id      = ""
+              - transit_gateway_id        = ""
+              - vpc_peering_connection_id = ""
+            },
+        ] -> null
+      - tags             = {
+          - "Name" = "Ex. 4 route table for Internet access"
+        } -> null
+      - vpc_id           = "vpc-0b508a704edb473cb" -> null
+    }
+
+  # aws_route_table_association.rt2public will be destroyed
+  - resource "aws_route_table_association" "rt2public" {
+      - id             = "rtbassoc-03399492da585a8f6" -> null
+      - route_table_id = "rtb-0667e7f44e185c197" -> null
+      - subnet_id      = "subnet-07a2d8e446b100c58" -> null
+    }
+
+  # aws_subnet.ex4_private will be destroyed
+  - resource "aws_subnet" "ex4_private" {
+      - arn                             = "arn:aws:ec2:eu-central-1:143440624024:subnet/subnet-02521eb45700f5398" -> null
+      - assign_ipv6_address_on_creation = false -> null
+      - availability_zone               = "eu-central-1c" -> null
+      - availability_zone_id            = "euc1-az1" -> null
+      - cidr_block                      = "10.42.0.0/24" -> null
+      - id                              = "subnet-02521eb45700f5398" -> null
+      - map_public_ip_on_launch         = false -> null
+      - owner_id                        = "143440624024" -> null
+      - tags                            = {
+          - "Name" = "Ex. 4 private subnet"
+        } -> null
+      - vpc_id                          = "vpc-0b508a704edb473cb" -> null
+    }
+
+  # aws_subnet.ex4_public will be destroyed
+  - resource "aws_subnet" "ex4_public" {
+      - arn                             = "arn:aws:ec2:eu-central-1:143440624024:subnet/subnet-07a2d8e446b100c58" -> null
+      - assign_ipv6_address_on_creation = false -> null
+      - availability_zone               = "eu-central-1a" -> null
+      - availability_zone_id            = "euc1-az2" -> null
+      - cidr_block                      = "10.42.255.0/24" -> null
+      - id                              = "subnet-07a2d8e446b100c58" -> null
+      - map_public_ip_on_launch         = true -> null
+      - owner_id                        = "143440624024" -> null
+      - tags                            = {
+          - "Name" = "Ex. 4 public subnet"
+        } -> null
+      - vpc_id                          = "vpc-0b508a704edb473cb" -> null
+    }
+
+  # aws_vpc.ex4_vpc will be destroyed
+  - resource "aws_vpc" "ex4_vpc" {
+      - arn                              = "arn:aws:ec2:eu-central-1:143440624024:vpc/vpc-0b508a704edb473cb" -> null
+      - assign_generated_ipv6_cidr_block = false -> null
+      - cidr_block                       = "10.42.0.0/16" -> null
+      - default_network_acl_id           = "acl-09e1365852f2f4dfd" -> null
+      - default_route_table_id           = "rtb-0322e2794276fc538" -> null
+      - default_security_group_id        = "sg-084a86c98ad8c2128" -> null
+      - dhcp_options_id                  = "dopt-983cf3f2" -> null
+      - enable_dns_hostnames             = true -> null
+      - enable_dns_support               = true -> null
+      - id                               = "vpc-0b508a704edb473cb" -> null
+      - instance_tenancy                 = "default" -> null
+      - main_route_table_id              = "rtb-0322e2794276fc538" -> null
+      - owner_id                         = "143440624024" -> null
+      - tags                             = {
+          - "Name" = "Ex. 4 VPC"
+        } -> null
+    }
+
+Plan: 0 to add, 0 to change, 12 to destroy.
+
+Do you really want to destroy all resources?
+  Terraform will destroy all your managed infrastructure, as shown above.
+  There is no undo. Only 'yes' will be accepted to confirm.
+
+  Enter a value: yes
+
+aws_route_table_association.rt2public: Destroying... [id=rtbassoc-03399492da585a8f6]
+aws_eip.ex4_eip: Destroying... [id=eipalloc-09fb621227a1fdf29]
+aws_default_security_group.def_sg: Destroying... [id=sg-084a86c98ad8c2128]
+aws_default_security_group.def_sg: Destruction complete after 0s
+aws_instance.ex4_jump: Destroying... [id=i-0e2bdac3c56bd21e5]
+aws_instance.ex4_other: Destroying... [id=i-027f0cb1638fd711c]
+aws_route_table_association.rt2public: Destruction complete after 1s
+aws_route_table.ex4_rt: Destroying... [id=rtb-0667e7f44e185c197]
+aws_route_table.ex4_rt: Destruction complete after 1s
+aws_eip.ex4_eip: Destruction complete after 2s
+aws_instance.ex4_web: Destroying... [id=i-023b492515018c825]
+aws_instance.ex4_jump: Still destroying... [id=i-0e2bdac3c56bd21e5, 10s elapsed]
+aws_instance.ex4_other: Still destroying... [id=i-027f0cb1638fd711c, 10s elapsed]
+aws_instance.ex4_web: Still destroying... [id=i-023b492515018c825, 10s elapsed]
+aws_instance.ex4_jump: Still destroying... [id=i-0e2bdac3c56bd21e5, 20s elapsed]
+aws_instance.ex4_other: Still destroying... [id=i-027f0cb1638fd711c, 20s elapsed]
+aws_instance.ex4_web: Still destroying... [id=i-023b492515018c825, 20s elapsed]
+aws_instance.ex4_jump: Destruction complete after 27s
+aws_instance.ex4_other: Destruction complete after 28s
+aws_subnet.ex4_private: Destroying... [id=subnet-02521eb45700f5398]
+aws_instance.ex4_web: Destruction complete after 25s
+aws_subnet.ex4_public: Destroying... [id=subnet-07a2d8e446b100c58]
+aws_key_pair.course_ssh_key: Destroying... [id=tf-pubcloud2020]
+aws_internet_gateway.ex4_igw: Destroying... [id=igw-0f441755d966d38af]
+aws_key_pair.course_ssh_key: Destruction complete after 2s
+aws_subnet.ex4_private: Destruction complete after 2s
+aws_subnet.ex4_public: Destruction complete after 3s
+aws_internet_gateway.ex4_igw: Still destroying... [id=igw-0f441755d966d38af, 10s elapsed]
+aws_internet_gateway.ex4_igw: Destruction complete after 13s
+aws_vpc.ex4_vpc: Destroying... [id=vpc-0b508a704edb473cb]
+aws_vpc.ex4_vpc: Destruction complete after 1s
+
+Destroy complete! Resources: 12 destroyed.
+$ terraform show
+
+```
+
+I expect the EC2 instances to still be shown,
+but in *terminated* state.
+The other resources should be gone.
+
+```
+$ aws ec2 describe-addresses
+-------------------
+|DescribeAddresses|
++-----------------+
+$ aws ec2 describe-vpcs --filter Name=isDefault,Values=false
+--------------
+|DescribeVpcs|
++------------+
+$ aws ec2 describe-instances
+----------------------------------------------------------------------------
+|                             DescribeInstances                            |
++--------------------------------------------------------------------------+
+||                              Reservations                              ||
+|+-----------------------------+------------------------------------------+|
+||  OwnerId                    |  143440624024                            ||
+||  ReservationId              |  r-08063a964a8fbdc26                     ||
+|+-----------------------------+------------------------------------------+|
+|||                               Instances                              |||
+||+------------------------+---------------------------------------------+||
+|||  AmiLaunchIndex        |  0                                          |||
+|||  Architecture          |  x86_64                                     |||
+|||  ClientToken           |                                             |||
+|||  EbsOptimized          |  False                                      |||
+|||  EnaSupport            |  True                                       |||
+|||  Hypervisor            |  xen                                        |||
+|||  ImageId               |  ami-0e342d72b12109f91                      |||
+|||  InstanceId            |  i-0e2bdac3c56bd21e5                        |||
+|||  InstanceType          |  t2.micro                                   |||
+|||  KeyName               |  tf-pubcloud2020                            |||
+|||  LaunchTime            |  2020-04-26T14:25:05.000Z                   |||
+|||  PrivateDnsName        |                                             |||
+|||  PublicDnsName         |                                             |||
+|||  RootDeviceName        |  /dev/sda1                                  |||
+|||  RootDeviceType        |  ebs                                        |||
+|||  StateTransitionReason |  User initiated (2020-04-26 18:00:11 GMT)   |||
+|||  VirtualizationType    |  hvm                                        |||
+||+------------------------+---------------------------------------------+||
+||||                             Monitoring                             ||||
+|||+----------------------------+---------------------------------------+|||
+||||  State                     |  disabled                             ||||
+|||+----------------------------+---------------------------------------+|||
+||||                              Placement                             ||||
+|||+------------------------------------+-------------------------------+|||
+||||  AvailabilityZone                  |  eu-central-1a                ||||
+||||  GroupName                         |                               ||||
+||||  Tenancy                           |  default                      ||||
+|||+------------------------------------+-------------------------------+|||
+||||                                State                               ||||
+|||+-----------------------+--------------------------------------------+|||
+||||  Code                 |  48                                        ||||
+||||  Name                 |  terminated                                ||||
+|||+-----------------------+--------------------------------------------+|||
+||||                             StateReason                            ||||
+|||+---------+----------------------------------------------------------+|||
+||||  Code   |  Client.UserInitiatedShutdown                            ||||
+||||  Message|  Client.UserInitiatedShutdown: User initiated shutdown   ||||
+|||+---------+----------------------------------------------------------+|||
+||||                                Tags                                ||||
+|||+--------------------+-----------------------------------------------+|||
+||||  Key               |  Name                                         ||||
+||||  Value             |  Ex. 4 jump host                              ||||
+|||+--------------------+-----------------------------------------------+|||
+||                              Reservations                              ||
+|+-----------------------------+------------------------------------------+|
+||  OwnerId                    |  143440624024                            ||
+||  ReservationId              |  r-0b257df7cd51e1258                     ||
+|+-----------------------------+------------------------------------------+|
+|||                               Instances                              |||
+||+------------------------+---------------------------------------------+||
+|||  AmiLaunchIndex        |  0                                          |||
+|||  Architecture          |  x86_64                                     |||
+|||  ClientToken           |                                             |||
+|||  EbsOptimized          |  False                                      |||
+|||  EnaSupport            |  True                                       |||
+|||  Hypervisor            |  xen                                        |||
+|||  ImageId               |  ami-0e342d72b12109f91                      |||
+|||  InstanceId            |  i-023b492515018c825                        |||
+|||  InstanceType          |  t2.micro                                   |||
+|||  KeyName               |  tf-pubcloud2020                            |||
+|||  LaunchTime            |  2020-04-26T14:25:05.000Z                   |||
+|||  PrivateDnsName        |                                             |||
+|||  PublicDnsName         |                                             |||
+|||  RootDeviceName        |  /dev/sda1                                  |||
+|||  RootDeviceType        |  ebs                                        |||
+|||  StateTransitionReason |  User initiated (2020-04-26 18:00:13 GMT)   |||
+|||  VirtualizationType    |  hvm                                        |||
+||+------------------------+---------------------------------------------+||
+||||                             Monitoring                             ||||
+|||+----------------------------+---------------------------------------+|||
+||||  State                     |  disabled                             ||||
+|||+----------------------------+---------------------------------------+|||
+||||                              Placement                             ||||
+|||+------------------------------------+-------------------------------+|||
+||||  AvailabilityZone                  |  eu-central-1a                ||||
+||||  GroupName                         |                               ||||
+||||  Tenancy                           |  default                      ||||
+|||+------------------------------------+-------------------------------+|||
+||||                                State                               ||||
+|||+-----------------------+--------------------------------------------+|||
+||||  Code                 |  48                                        ||||
+||||  Name                 |  terminated                                ||||
+|||+-----------------------+--------------------------------------------+|||
+||||                             StateReason                            ||||
+|||+---------+----------------------------------------------------------+|||
+||||  Code   |  Client.UserInitiatedShutdown                            ||||
+||||  Message|  Client.UserInitiatedShutdown: User initiated shutdown   ||||
+|||+---------+----------------------------------------------------------+|||
+||||                                Tags                                ||||
+|||+--------------------+-----------------------------------------------+|||
+||||  Key               |  Name                                         ||||
+||||  Value             |  Ex. 4 web server                             ||||
+|||+--------------------+-----------------------------------------------+|||
+||                              Reservations                              ||
+|+-----------------------------+------------------------------------------+|
+||  OwnerId                    |  143440624024                            ||
+||  ReservationId              |  r-03d4fbade42676184                     ||
+|+-----------------------------+------------------------------------------+|
+|||                               Instances                              |||
+||+------------------------+---------------------------------------------+||
+|||  AmiLaunchIndex        |  0                                          |||
+|||  Architecture          |  x86_64                                     |||
+|||  ClientToken           |                                             |||
+|||  EbsOptimized          |  False                                      |||
+|||  EnaSupport            |  True                                       |||
+|||  Hypervisor            |  xen                                        |||
+|||  ImageId               |  ami-0e342d72b12109f91                      |||
+|||  InstanceId            |  i-027f0cb1638fd711c                        |||
+|||  InstanceType          |  t2.micro                                   |||
+|||  KeyName               |  tf-pubcloud2020                            |||
+|||  LaunchTime            |  2020-04-26T14:25:04.000Z                   |||
+|||  PrivateDnsName        |                                             |||
+|||  PublicDnsName         |                                             |||
+|||  RootDeviceName        |  /dev/sda1                                  |||
+|||  RootDeviceType        |  ebs                                        |||
+|||  StateTransitionReason |  User initiated (2020-04-26 18:00:11 GMT)   |||
+|||  VirtualizationType    |  hvm                                        |||
+||+------------------------+---------------------------------------------+||
+||||                             Monitoring                             ||||
+|||+----------------------------+---------------------------------------+|||
+||||  State                     |  disabled                             ||||
+|||+----------------------------+---------------------------------------+|||
+||||                              Placement                             ||||
+|||+------------------------------------+-------------------------------+|||
+||||  AvailabilityZone                  |  eu-central-1c                ||||
+||||  GroupName                         |                               ||||
+||||  Tenancy                           |  default                      ||||
+|||+------------------------------------+-------------------------------+|||
+||||                                State                               ||||
+|||+-----------------------+--------------------------------------------+|||
+||||  Code                 |  48                                        ||||
+||||  Name                 |  terminated                                ||||
+|||+-----------------------+--------------------------------------------+|||
+||||                             StateReason                            ||||
+|||+---------+----------------------------------------------------------+|||
+||||  Code   |  Client.UserInitiatedShutdown                            ||||
+||||  Message|  Client.UserInitiatedShutdown: User initiated shutdown   ||||
+|||+---------+----------------------------------------------------------+|||
+||||                                Tags                                ||||
+|||+------------------+-------------------------------------------------+|||
+||||  Key             |  Name                                           ||||
+||||  Value           |  Ex. 4 private host                             ||||
+|||+------------------+-------------------------------------------------+|||
+```
+
+The connectivity test script should now fail,
+since it cannot even determine the EC2 instance addresses:
+
+```
+$ ./connectivity_test
+--> connecting to elastic IP address via IP address...
+ssh: Could not resolve hostname null: Name or service not known
+***
+*** --- CONNECTIVITY TEST FAILED ---
+***
+```
+
+## That's All Folks!
+
+Another long exercise solution description comes to an end.
 
 ---
 
