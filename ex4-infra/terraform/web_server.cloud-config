@@ -1,0 +1,26 @@
+## template: jinja
+#cloud-config
+package_update: true
+package_upgrade: true
+packages:
+  - apache2
+write_files:
+  - path: /var/www/html/index.html
+    owner: 'root:root'
+    permissions: '0644'
+    content: |
+      <html>
+      <head>
+       <title>PubCloud 2020 - Exercise 4 - Virtual Network Infrastructure</title>
+      </head>
+      <body>
+       <h1>PubCloud 2020 - Exercise 4 - Virtual Network Infrastructure</h1>
+       <p>This website is part of my solution to hands-on exercise 4
+          of the <a href="https://www.ipspace.net/PubCloud/">Networking
+          in Public Cloud Deployments</a> course in the spring of 2020.</p>
+       <p>This request was served from host <b>{{v1.local_hostname}}</b> with
+          local IP address <b>{{ds.meta_data.local_ipv4}}</b> in availability
+          zone <b>{{v1.availability_zone}}</b> of region <b>{{v1.region}}</b>.
+          </p>
+      </body>
+      </html>
