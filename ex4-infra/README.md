@@ -365,7 +365,7 @@ containing a Terraform configuration:
 
 This results in the following image:
 
-![Terraform plan graph](the_plan.svg)
+![Terraform plan graph](terraform/the_plan.svg)
 
 Next I want take a look at the *apply* graph:
 
@@ -373,7 +373,7 @@ Next I want take a look at the *apply* graph:
 
 The image looks as follows:
 
-![Terraform apply graph](apply.svg)
+![Terraform apply graph](terraform/apply.svg)
 
 Then I go ahead and use `terraform apply`:
 
