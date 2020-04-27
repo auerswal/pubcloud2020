@@ -3903,7 +3903,7 @@ ssh: Could not resolve hostname null: Name or service not known
 ***
 ```
 
-## That's All Folks!
+## Fixing an Omission
 
 After re-reading the exercise description I noticed
 that the EIP should have a manual dependency in the Internet Gateway.
@@ -3915,6 +3915,917 @@ $ terraform validate
 Success! The configuration is valid.
 
 ```
+
+## Another Stab at the ENI
+
+After cleaning up,
+and resting a bit,
+I want to have another try at the ENI.
+I'll change the subnets to lie in the same availability zone (AZ),
+because the initial problem were different AZs.
+I then revert the commit that removed the ENI.
+Let's see if this works:
+
+```
+$ terraform validate
+Success! The configuration is valid.
+
+$ terraform apply
+data.aws_ami.gnu_linux_image: Refreshing state...
+
+An execution plan has been generated and is shown below.
+Resource actions are indicated with the following symbols:
+  + create
+
+Terraform will perform the following actions:
+
+  # aws_default_security_group.def_sg will be created
+  + resource "aws_default_security_group" "def_sg" {
+      + arn                    = (known after apply)
+      + description            = (known after apply)
+      + egress                 = [
+          + {
+              + cidr_blocks      = [
+                  + "0.0.0.0/0",
+                ]
+              + description      = "Allow Internet access for, e.g., updates"
+              + from_port        = 0
+              + ipv6_cidr_blocks = []
+              + prefix_list_ids  = []
+              + protocol         = "-1"
+              + security_groups  = []
+              + self             = false
+              + to_port          = 0
+            },
+        ]
+      + id                     = (known after apply)
+      + ingress                = [
+          + {
+              + cidr_blocks      = [
+                  + "0.0.0.0/0",
+                ]
+              + description      = "Allow HTTP from the Internet"
+              + from_port        = 80
+              + ipv6_cidr_blocks = []
+              + prefix_list_ids  = []
+              + protocol         = "tcp"
+              + security_groups  = []
+              + self             = false
+              + to_port          = 80
+            },
+          + {
+              + cidr_blocks      = [
+                  + "0.0.0.0/0",
+                ]
+              + description      = "Allow HTTPS from the Internet"
+              + from_port        = 443
+              + ipv6_cidr_blocks = []
+              + prefix_list_ids  = []
+              + protocol         = "tcp"
+              + security_groups  = []
+              + self             = false
+              + to_port          = 443
+            },
+          + {
+              + cidr_blocks      = [
+                  + "0.0.0.0/0",
+                ]
+              + description      = "Allow SSH from the Internet"
+              + from_port        = 22
+              + ipv6_cidr_blocks = []
+              + prefix_list_ids  = []
+              + protocol         = "tcp"
+              + security_groups  = []
+              + self             = false
+              + to_port          = 22
+            },
+          + {
+              + cidr_blocks      = []
+              + description      = "Allow everything inside the SG"
+              + from_port        = 0
+              + ipv6_cidr_blocks = []
+              + prefix_list_ids  = []
+              + protocol         = "-1"
+              + security_groups  = []
+              + self             = true
+              + to_port          = 0
+            },
+        ]
+      + name                   = (known after apply)
+      + owner_id               = (known after apply)
+      + revoke_rules_on_delete = false
+      + tags                   = {
+          + "Name" = "Ex. 4 default Security Group"
+        }
+      + vpc_id                 = (known after apply)
+    }
+
+  # aws_eip.ex4_eip will be created
+  + resource "aws_eip" "ex4_eip" {
+      + allocation_id     = (known after apply)
+      + association_id    = (known after apply)
+      + domain            = (known after apply)
+      + id                = (known after apply)
+      + instance          = (known after apply)
+      + network_interface = (known after apply)
+      + private_dns       = (known after apply)
+      + private_ip        = (known after apply)
+      + public_dns        = (known after apply)
+      + public_ip         = (known after apply)
+      + public_ipv4_pool  = (known after apply)
+      + vpc               = true
+    }
+
+  # aws_instance.ex4_jump will be created
+  + resource "aws_instance" "ex4_jump" {
+      + ami                          = "ami-0e342d72b12109f91"
+      + arn                          = (known after apply)
+      + associate_public_ip_address  = (known after apply)
+      + availability_zone            = (known after apply)
+      + cpu_core_count               = (known after apply)
+      + cpu_threads_per_core         = (known after apply)
+      + get_password_data            = false
+      + host_id                      = (known after apply)
+      + id                           = (known after apply)
+      + instance_state               = (known after apply)
+      + instance_type                = "t2.micro"
+      + ipv6_address_count           = (known after apply)
+      + ipv6_addresses               = (known after apply)
+      + key_name                     = (known after apply)
+      + network_interface_id         = (known after apply)
+      + password_data                = (known after apply)
+      + placement_group              = (known after apply)
+      + primary_network_interface_id = (known after apply)
+      + private_dns                  = (known after apply)
+      + private_ip                   = (known after apply)
+      + public_dns                   = (known after apply)
+      + public_ip                    = (known after apply)
+      + security_groups              = (known after apply)
+      + source_dest_check            = true
+      + subnet_id                    = (known after apply)
+      + tags                         = {
+          + "Name" = "Ex. 4 jump host"
+        }
+      + tenancy                      = (known after apply)
+      + user_data                    = "9ed191a9e90b29779765efa9828c23574c1d97a7"
+      + volume_tags                  = (known after apply)
+      + vpc_security_group_ids       = (known after apply)
+
+      + ebs_block_device {
+          + delete_on_termination = (known after apply)
+          + device_name           = (known after apply)
+          + encrypted             = (known after apply)
+          + iops                  = (known after apply)
+          + kms_key_id            = (known after apply)
+          + snapshot_id           = (known after apply)
+          + volume_id             = (known after apply)
+          + volume_size           = (known after apply)
+          + volume_type           = (known after apply)
+        }
+
+      + ephemeral_block_device {
+          + device_name  = (known after apply)
+          + no_device    = (known after apply)
+          + virtual_name = (known after apply)
+        }
+
+      + network_interface {
+          + delete_on_termination = (known after apply)
+          + device_index          = (known after apply)
+          + network_interface_id  = (known after apply)
+        }
+
+      + root_block_device {
+          + delete_on_termination = (known after apply)
+          + encrypted             = (known after apply)
+          + iops                  = (known after apply)
+          + kms_key_id            = (known after apply)
+          + volume_id             = (known after apply)
+          + volume_size           = (known after apply)
+          + volume_type           = (known after apply)
+        }
+    }
+
+  # aws_instance.ex4_other will be created
+  + resource "aws_instance" "ex4_other" {
+      + ami                          = "ami-0e342d72b12109f91"
+      + arn                          = (known after apply)
+      + associate_public_ip_address  = (known after apply)
+      + availability_zone            = (known after apply)
+      + cpu_core_count               = (known after apply)
+      + cpu_threads_per_core         = (known after apply)
+      + get_password_data            = false
+      + host_id                      = (known after apply)
+      + id                           = (known after apply)
+      + instance_state               = (known after apply)
+      + instance_type                = "t2.micro"
+      + ipv6_address_count           = (known after apply)
+      + ipv6_addresses               = (known after apply)
+      + key_name                     = (known after apply)
+      + network_interface_id         = (known after apply)
+      + password_data                = (known after apply)
+      + placement_group              = (known after apply)
+      + primary_network_interface_id = (known after apply)
+      + private_dns                  = (known after apply)
+      + private_ip                   = (known after apply)
+      + public_dns                   = (known after apply)
+      + public_ip                    = (known after apply)
+      + security_groups              = (known after apply)
+      + source_dest_check            = true
+      + subnet_id                    = (known after apply)
+      + tags                         = {
+          + "Name" = "Ex. 4 private host"
+        }
+      + tenancy                      = (known after apply)
+      + user_data                    = "455b01c87a20b41630a012c794e4d53d8cda1d75"
+      + volume_tags                  = (known after apply)
+      + vpc_security_group_ids       = (known after apply)
+
+      + ebs_block_device {
+          + delete_on_termination = (known after apply)
+          + device_name           = (known after apply)
+          + encrypted             = (known after apply)
+          + iops                  = (known after apply)
+          + kms_key_id            = (known after apply)
+          + snapshot_id           = (known after apply)
+          + volume_id             = (known after apply)
+          + volume_size           = (known after apply)
+          + volume_type           = (known after apply)
+        }
+
+      + ephemeral_block_device {
+          + device_name  = (known after apply)
+          + no_device    = (known after apply)
+          + virtual_name = (known after apply)
+        }
+
+      + network_interface {
+          + delete_on_termination = (known after apply)
+          + device_index          = (known after apply)
+          + network_interface_id  = (known after apply)
+        }
+
+      + root_block_device {
+          + delete_on_termination = (known after apply)
+          + encrypted             = (known after apply)
+          + iops                  = (known after apply)
+          + kms_key_id            = (known after apply)
+          + volume_id             = (known after apply)
+          + volume_size           = (known after apply)
+          + volume_type           = (known after apply)
+        }
+    }
+
+  # aws_instance.ex4_web will be created
+  + resource "aws_instance" "ex4_web" {
+      + ami                          = "ami-0e342d72b12109f91"
+      + arn                          = (known after apply)
+      + associate_public_ip_address  = (known after apply)
+      + availability_zone            = (known after apply)
+      + cpu_core_count               = (known after apply)
+      + cpu_threads_per_core         = (known after apply)
+      + get_password_data            = false
+      + host_id                      = (known after apply)
+      + id                           = (known after apply)
+      + instance_state               = (known after apply)
+      + instance_type                = "t2.micro"
+      + ipv6_address_count           = (known after apply)
+      + ipv6_addresses               = (known after apply)
+      + key_name                     = (known after apply)
+      + network_interface_id         = (known after apply)
+      + password_data                = (known after apply)
+      + placement_group              = (known after apply)
+      + primary_network_interface_id = (known after apply)
+      + private_dns                  = (known after apply)
+      + private_ip                   = (known after apply)
+      + public_dns                   = (known after apply)
+      + public_ip                    = (known after apply)
+      + security_groups              = (known after apply)
+      + source_dest_check            = true
+      + subnet_id                    = (known after apply)
+      + tags                         = {
+          + "Name" = "Ex. 4 web server"
+        }
+      + tenancy                      = (known after apply)
+      + user_data                    = "6197aaec194f10c08caf60960ec297a41f695ad2"
+      + volume_tags                  = (known after apply)
+      + vpc_security_group_ids       = (known after apply)
+
+      + ebs_block_device {
+          + delete_on_termination = (known after apply)
+          + device_name           = (known after apply)
+          + encrypted             = (known after apply)
+          + iops                  = (known after apply)
+          + kms_key_id            = (known after apply)
+          + snapshot_id           = (known after apply)
+          + volume_id             = (known after apply)
+          + volume_size           = (known after apply)
+          + volume_type           = (known after apply)
+        }
+
+      + ephemeral_block_device {
+          + device_name  = (known after apply)
+          + no_device    = (known after apply)
+          + virtual_name = (known after apply)
+        }
+
+      + network_interface {
+          + delete_on_termination = (known after apply)
+          + device_index          = (known after apply)
+          + network_interface_id  = (known after apply)
+        }
+
+      + root_block_device {
+          + delete_on_termination = (known after apply)
+          + encrypted             = (known after apply)
+          + iops                  = (known after apply)
+          + kms_key_id            = (known after apply)
+          + volume_id             = (known after apply)
+          + volume_size           = (known after apply)
+          + volume_type           = (known after apply)
+        }
+    }
+
+  # aws_internet_gateway.ex4_igw will be created
+  + resource "aws_internet_gateway" "ex4_igw" {
+      + id       = (known after apply)
+      + owner_id = (known after apply)
+      + tags     = {
+          + "Name" = "Ex. 4 Internet gateway"
+        }
+      + vpc_id   = (known after apply)
+    }
+
+  # aws_key_pair.course_ssh_key will be created
+  + resource "aws_key_pair" "course_ssh_key" {
+      + fingerprint = (known after apply)
+      + id          = (known after apply)
+      + key_name    = "tf-pubcloud2020"
+      + key_pair_id = (known after apply)
+      + public_key  = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDDiXuVGxn6zqLCPKbcojNC813FAnOPBWToBz/XTQaMzMsoAeKMRwVrUoyHEVj8UTFiuEUbTz/0jHItv5ZmFXI1DNY1m+hXxCDVcBp8ojCutX3+AJ012qG2PIZaloaYCjrTkhHj9VmMHAl1jzJ0EbPsoU/Qc4pZCNUNaCVCkG6EHisOUy9wx20i4gA/nrDnjIxk9TD2mGdlVCK7SESH/vGWgMtU6fLI65trtC4eojPNNUyMq8tTLyJxoTdYEwMY5alKkcjjw6+yVBOrtYgZSlMW02WLTkJT7eCxwVHig8a+bywiwAxuvYlUgfmOHEGEIXXTGk/+KNiLrDXdmkK4kuUvlf6rD7qR/kedqQAt0k5v/PiW3ufpej7n1ZBZroSsBT/0Yp5UcCLxpzskUYu+TRLRp+6gI50KsNe/oT8tesNtOVTK2ePD4eXApXAYwQpXy1389c4gGgh4wWljmHyeoFjcd4Soq847/PNspRdswR/u5jyswTsCROKsCJ4+whJRme8JoqaZHGBTpTu9n6gaZJVXbFM/55RYh0bpuCD5BHrdk0+HX4BmhJ1KqdDTDR84y2riwlpv6Eiw8AX8N2GVLOpP6RMt/AUCNUEy5nPWJosKb+UQE/j1dRJ9iorm2EGbh30dv/nRCb2Cu7BVyNWbmSrVaKdJub28SfV5L51sd+ATBw== auerswald@short"
+    }
+
+  # aws_network_interface.ex4_eni will be created
+  + resource "aws_network_interface" "ex4_eni" {
+      + id                = (known after apply)
+      + mac_address       = (known after apply)
+      + private_dns_name  = (known after apply)
+      + private_ip        = (known after apply)
+      + private_ips       = (known after apply)
+      + private_ips_count = (known after apply)
+      + security_groups   = (known after apply)
+      + source_dest_check = true
+      + subnet_id         = (known after apply)
+
+      + attachment {
+          + attachment_id = (known after apply)
+          + device_index  = 1
+          + instance      = (known after apply)
+        }
+    }
+
+  # aws_route_table.ex4_rt will be created
+  + resource "aws_route_table" "ex4_rt" {
+      + id               = (known after apply)
+      + owner_id         = (known after apply)
+      + propagating_vgws = (known after apply)
+      + route            = [
+          + {
+              + cidr_block                = "0.0.0.0/0"
+              + egress_only_gateway_id    = ""
+              + gateway_id                = (known after apply)
+              + instance_id               = ""
+              + ipv6_cidr_block           = ""
+              + nat_gateway_id            = ""
+              + network_interface_id      = ""
+              + transit_gateway_id        = ""
+              + vpc_peering_connection_id = ""
+            },
+        ]
+      + tags             = {
+          + "Name" = "Ex. 4 route table for Internet access"
+        }
+      + vpc_id           = (known after apply)
+    }
+
+  # aws_route_table_association.rt2public will be created
+  + resource "aws_route_table_association" "rt2public" {
+      + id             = (known after apply)
+      + route_table_id = (known after apply)
+      + subnet_id      = (known after apply)
+    }
+
+  # aws_subnet.ex4_private will be created
+  + resource "aws_subnet" "ex4_private" {
+      + arn                             = (known after apply)
+      + assign_ipv6_address_on_creation = false
+      + availability_zone               = (known after apply)
+      + availability_zone_id            = (known after apply)
+      + cidr_block                      = "10.42.0.0/24"
+      + id                              = (known after apply)
+      + ipv6_cidr_block                 = (known after apply)
+      + ipv6_cidr_block_association_id  = (known after apply)
+      + map_public_ip_on_launch         = false
+      + owner_id                        = (known after apply)
+      + tags                            = {
+          + "Name" = "Ex. 4 private subnet"
+        }
+      + vpc_id                          = (known after apply)
+    }
+
+  # aws_subnet.ex4_public will be created
+  + resource "aws_subnet" "ex4_public" {
+      + arn                             = (known after apply)
+      + assign_ipv6_address_on_creation = false
+      + availability_zone               = (known after apply)
+      + availability_zone_id            = (known after apply)
+      + cidr_block                      = "10.42.255.0/24"
+      + id                              = (known after apply)
+      + ipv6_cidr_block                 = (known after apply)
+      + ipv6_cidr_block_association_id  = (known after apply)
+      + map_public_ip_on_launch         = true
+      + owner_id                        = (known after apply)
+      + tags                            = {
+          + "Name" = "Ex. 4 public subnet"
+        }
+      + vpc_id                          = (known after apply)
+    }
+
+  # aws_vpc.ex4_vpc will be created
+  + resource "aws_vpc" "ex4_vpc" {
+      + arn                              = (known after apply)
+      + assign_generated_ipv6_cidr_block = false
+      + cidr_block                       = "10.42.0.0/16"
+      + default_network_acl_id           = (known after apply)
+      + default_route_table_id           = (known after apply)
+      + default_security_group_id        = (known after apply)
+      + dhcp_options_id                  = (known after apply)
+      + enable_classiclink               = (known after apply)
+      + enable_classiclink_dns_support   = (known after apply)
+      + enable_dns_hostnames             = true
+      + enable_dns_support               = true
+      + id                               = (known after apply)
+      + instance_tenancy                 = "default"
+      + ipv6_association_id              = (known after apply)
+      + ipv6_cidr_block                  = (known after apply)
+      + main_route_table_id              = (known after apply)
+      + owner_id                         = (known after apply)
+      + tags                             = {
+          + "Name" = "Ex. 4 VPC"
+        }
+    }
+
+Plan: 13 to add, 0 to change, 0 to destroy.
+
+Do you want to perform these actions?
+  Terraform will perform the actions described above.
+  Only 'yes' will be accepted to approve.
+
+  Enter a value: yes
+
+aws_key_pair.course_ssh_key: Creating...
+aws_vpc.ex4_vpc: Creating...
+aws_key_pair.course_ssh_key: Creation complete after 2s [id=tf-pubcloud2020]
+aws_vpc.ex4_vpc: Creation complete after 8s [id=vpc-0cc9be38629ed8a8a]
+aws_internet_gateway.ex4_igw: Creating...
+aws_subnet.ex4_public: Creating...
+aws_default_security_group.def_sg: Creating...
+aws_subnet.ex4_public: Creation complete after 5s [id=subnet-02c4ad38122def936]
+aws_subnet.ex4_private: Creating...
+aws_internet_gateway.ex4_igw: Creation complete after 5s [id=igw-0f42dc8ec85c8d967]
+aws_route_table.ex4_rt: Creating...
+aws_instance.ex4_jump: Creating...
+aws_instance.ex4_web: Creating...
+aws_default_security_group.def_sg: Creation complete after 8s [id=sg-077107ea76f7d43ec]
+aws_subnet.ex4_private: Creation complete after 4s [id=subnet-0b6501e96ac1c382e]
+aws_instance.ex4_other: Creating...
+aws_route_table.ex4_rt: Creation complete after 5s [id=rtb-027f15fc98c7f1ca9]
+aws_route_table_association.rt2public: Creating...
+aws_route_table_association.rt2public: Creation complete after 0s [id=rtbassoc-04eebfe66ea69990e]
+aws_instance.ex4_jump: Still creating... [10s elapsed]
+aws_instance.ex4_web: Still creating... [10s elapsed]
+aws_instance.ex4_other: Still creating... [10s elapsed]
+aws_instance.ex4_jump: Still creating... [20s elapsed]
+aws_instance.ex4_web: Still creating... [20s elapsed]
+aws_instance.ex4_other: Still creating... [20s elapsed]
+aws_instance.ex4_web: Creation complete after 28s [id=i-0e6a44fcbc63202b4]
+aws_instance.ex4_jump: Creation complete after 28s [id=i-008c1e5d0aa21dfd9]
+aws_eip.ex4_eip: Creating...
+aws_network_interface.ex4_eni: Creating...
+aws_eip.ex4_eip: Creation complete after 3s [id=eipalloc-08e73c40798d4b038]
+aws_network_interface.ex4_eni: Creation complete after 4s [id=eni-0253842beb4f2cbd5]
+aws_instance.ex4_other: Still creating... [30s elapsed]
+aws_instance.ex4_other: Creation complete after 30s [id=i-091da68ea07361a20]
+
+Apply complete! Resources: 13 added, 0 changed, 0 destroyed.
+
+Outputs:
+
+VPC_prefix = 10.42.0.0/16
+eip_ip = 18.156.205.156
+eip_name = ec2-18-156-205-156.eu-central-1.compute.amazonaws.com
+eip_private_ip = 10.42.255.116
+eip_private_name = ip-10-42-255-116.eu-central-1.compute.internal
+eni_private_ip = 10.42.255.174
+jump_host_ip = 35.157.127.13
+jump_host_name = ec2-35-157-127-13.eu-central-1.compute.amazonaws.com
+jump_host_privat_ip = 10.42.255.204
+jump_host_privat_name = ip-10-42-255-204.eu-central-1.compute.internal
+private_host_ip = 10.42.0.155
+private_host_name = ip-10-42-0-155.eu-central-1.compute.internal
+private_subnet_prefix = 10.42.0.0/24
+public_subnet_prefix = 10.42.255.0/24
+web_server_ip = 35.157.98.213
+web_server_name = ec2-35-157-98-213.eu-central-1.compute.amazonaws.com
+web_server_private_ip = 10.42.255.116
+web_server_private_name = ip-10-42-255-116.eu-central-1.compute.internal
+```
+
+Well this did report success,
+but the ENI was created after the EC2 instance,
+thus it may be for cloud-init to detect and configure it.
+First let's test connectivity:
+
+```
+$ ./connectivity_test
+--> connecting to elastic IP address via IP address...
+Warning: Permanently added '18.156.205.156' (ECDSA) to the list of known hosts.
+--> OK
+--> connecting to elastic IP address via DNS name...
+Warning: Permanently added 'ec2-18-156-205-156.eu-central-1.compute.amazonaws.com,18.156.205.156' (ECDSA) to the list of known hosts.
+--> OK
+--> connecting to jump server via IP address...
+Warning: Permanently added '35.157.127.13' (ECDSA) to the list of known hosts.
+--> OK
+--> connecting to jump server via DNS name...
+Warning: Permanently added 'ec2-35-157-127-13.eu-central-1.compute.amazonaws.com,35.157.127.13' (ECDSA) to the list of known hosts.
+--> OK
+--> accessing web page via IP address...
+--> OK
+--> accessing web page via DNS name...
+--> OK
+--> connecting via jump host to host on private subnet...
+Warning: Permanently added '10.42.0.155' (ECDSA) to the list of known hosts.
+--> OK
+--> testing internal connectivity of host on private subnet...
+Warning: Permanently added '10.42.0.155' (ECDSA) to the list of known hosts.
+PING 10.42.255.116 (10.42.255.116) 56(84) bytes of data.
+64 bytes from 10.42.255.116: icmp_seq=1 ttl=64 time=0.406 ms
+64 bytes from 10.42.255.116: icmp_seq=2 ttl=64 time=0.445 ms
+
+--- 10.42.255.116 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1021ms
+rtt min/avg/max/mdev = 0.406/0.425/0.445/0.028 ms
+--> OK
+--> testing for no external connectivity of host on private subnet...
+Warning: Permanently added '10.42.0.155' (ECDSA) to the list of known hosts.
+PING 8.8.8.8 (8.8.8.8) 56(84) bytes of data.
+
+--- 8.8.8.8 ping statistics ---
+2 packets transmitted, 0 received, 100% packet loss, time 1009ms
+
+--> OK
+
+==> All tests passed successfully, :-)
+```
+
+So far, so good.
+Now for the ENI:
+
+```
+$ ssh ubuntu@35.157.127.13 ip a s dev eth1
+3: eth1: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN group default qlen 1000
+    link/ether 06:03:29:96:39:e4 brd ff:ff:ff:ff:ff:ff
+```
+
+The ENI is attached to the jump host instance,
+but is not activated.
+I probably need to tell cloud-init about it.
+There is an
+[AWS support article](https://aws.amazon.com/premiumsupport/knowledge-center/ec2-ubuntu-secondary-network-interface/)
+about this issue.
+I adapt the idea of writing a `51-eth1.yaml` file for
+[netplan](https://netplan.io/),
+destroy the deployment,
+and will try again
+(I'll omit the `terraform apply` output).
+
+That nearly worked,
+the netplan config file is found on the jump host,
+but the interface is still not active:
+
+```
+$ ssh "ubuntu@$(jq -r '.outputs.jump_host_name.value' terraform.tfstate)" ls /etc/netplan
+50-cloud-init.yaml
+51-eth1.yaml
+$ ssh "ubuntu@$(jq -r '.outputs.jump_host_name.value' terraform.tfstate)" ip a s dev eth1
+3: eth1: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN group default qlen 1000
+    link/ether 02:fe:be:6c:ce:a4 brd ff:ff:ff:ff:ff:ff
+```
+
+Loggin in and using `netplan apply` brings up the interface:
+
+```
+$ ssh "ubuntu@$(jq -r '.outputs.jump_host_name.value' terraform.tfstate)"
+Welcome to Ubuntu 18.04.4 LTS (GNU/Linux 4.15.0-1065-aws x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/advantage
+
+  System information as of Mon Apr 27 18:51:45 UTC 2020
+
+  System load:  0.06              Processes:           90
+  Usage of /:   16.0% of 7.69GB   Users logged in:     0
+  Memory usage: 17%               IP address for eth0: 10.42.255.139
+  Swap usage:   0%
+
+
+0 packages can be updated.
+0 updates are security updates.
+
+
+To run a command as administrator (user "root"), use "sudo <command>".
+See "man sudo_root" for details.
+
+ubuntu@ip-10-42-255-139:~$ sudo netplan apply
+ubuntu@ip-10-42-255-139:~$ ip a s dev eth1
+3: eth1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9001 qdisc fq_codel state UP group default qlen 1000
+    link/ether 02:fe:be:6c:ce:a4 brd ff:ff:ff:ff:ff:ff
+    inet 10.42.255.81/24 brd 10.42.255.255 scope global dynamic eth1
+       valid_lft 3596sec preferred_lft 3596sec
+    inet6 fe80::fe:beff:fe6c:cea4/64 scope link
+       valid_lft forever preferred_lft forever
+```
+
+Well, I restored the ENI configuration on the public subnet,
+but I need it on the private subnet.
+So I change the Terraform configuration and `apply` the change:
+
+```
+aws_subnet.ex4_public: Refreshing state... [id=subnet-09c48638779bbd3fa]
+aws_default_security_group.def_sg: Refreshing state... [id=sg-061ad723c83af8359]
+aws_route_table.ex4_rt: Refreshing state... [id=rtb-0ac9ce7921494c232]
+aws_subnet.ex4_private: Refreshing state... [id=subnet-0051550c35b7c7ed8]
+aws_instance.ex4_jump: Refreshing state... [id=i-0d701ff1419896eb0]
+aws_instance.ex4_web: Refreshing state... [id=i-0bd198258e9a3a390]
+aws_route_table_association.rt2public: Refreshing state... [id=rtbassoc-0064e5d4f9f541296]
+aws_instance.ex4_other: Refreshing state... [id=i-0f77b1d1c6aead81c]
+aws_network_interface.ex4_eni: Refreshing state... [id=eni-0fbcb7ac01c68f05a]
+aws_eip.ex4_eip: Refreshing state... [id=eipalloc-0d4e396811a6dc246]
+
+An execution plan has been generated and is shown below.
+Resource actions are indicated with the following symbols:
+-/+ destroy and then create replacement
+
+Terraform will perform the following actions:
+
+  # aws_network_interface.ex4_eni must be replaced
+-/+ resource "aws_network_interface" "ex4_eni" {
+      ~ id                = "eni-0fbcb7ac01c68f05a" -> (known after apply)
+      ~ mac_address       = "02:fe:be:6c:ce:a4" -> (known after apply)
+      ~ private_dns_name  = "ip-10-42-255-81.eu-central-1.compute.internal" -> (known after apply)
+      ~ private_ip        = "10.42.255.81" -> (known after apply)
+      ~ private_ips       = [
+          - "10.42.255.81",
+        ] -> (known after apply)
+      ~ private_ips_count = 0 -> (known after apply)
+      ~ security_groups   = [
+          - "sg-061ad723c83af8359",
+        ] -> (known after apply)
+        source_dest_check = true
+      ~ subnet_id         = "subnet-09c48638779bbd3fa" -> "subnet-0051550c35b7c7ed8" # forces replacement
+      - tags              = {} -> null
+
+      - attachment {
+          - attachment_id = "eni-attach-02fab3013ae931b81" -> null
+          - device_index  = 1 -> null
+          - instance      = "i-0d701ff1419896eb0" -> null
+        }
+      + attachment {
+          + attachment_id = (known after apply)
+          + device_index  = 1
+          + instance      = "i-0d701ff1419896eb0"
+        }
+    }
+
+Plan: 1 to add, 0 to change, 1 to destroy.
+
+Do you want to perform these actions?
+  Terraform will perform the actions described above.
+  Only 'yes' will be accepted to approve.
+
+  Enter a value: yes
+
+aws_network_interface.ex4_eni: Destroying... [id=eni-0fbcb7ac01c68f05a]
+aws_network_interface.ex4_eni: Still destroying... [id=eni-0fbcb7ac01c68f05a, 10s elapsed]
+aws_network_interface.ex4_eni: Still destroying... [id=eni-0fbcb7ac01c68f05a, 20s elapsed]
+aws_network_interface.ex4_eni: Destruction complete after 26s
+aws_network_interface.ex4_eni: Creating...
+aws_network_interface.ex4_eni: Creation complete after 5s [id=eni-064492d897c285ba1]
+
+Apply complete! Resources: 1 added, 0 changed, 1 destroyed.
+
+Outputs:
+
+VPC_prefix = 10.42.0.0/16
+eip_ip = 18.156.181.105
+eip_name = ec2-18-156-181-105.eu-central-1.compute.amazonaws.com
+eip_private_ip = 10.42.255.153
+eip_private_name = ip-10-42-255-153.eu-central-1.compute.internal
+eni_private_ip = 10.42.0.61
+jump_host_ip = 18.194.28.49
+jump_host_name = ec2-18-194-28-49.eu-central-1.compute.amazonaws.com
+jump_host_privat_ip = 10.42.255.139
+jump_host_privat_name = ip-10-42-255-139.eu-central-1.compute.internal
+private_host_ip = 10.42.0.218
+private_host_name = ip-10-42-0-218.eu-central-1.compute.internal
+private_subnet_prefix = 10.42.0.0/24
+public_subnet_prefix = 10.42.255.0/24
+web_server_ip = 18.156.181.105
+web_server_name = ec2-18-156-181-105.eu-central-1.compute.amazonaws.com
+web_server_private_ip = 10.42.255.153
+web_server_private_name = ip-10-42-255-153.eu-central-1.compute.internal
+```
+
+After a short while,
+the jump host's `eth1` interface uses the AWS assigned IP address.
+
+Now I just need to make it work on instance creation.
+As I see it,
+the problem lies in first creating the instance,
+and then attaching the ENI.
+Thus the cloud-init network configuration probably does not see the ENI.
+
+I'll destroy the deployment,
+and look into it some more.
+
+Perhaps it does work to just call `netplan apply` during boot.
+The initial cloud-init network configuration is documented
+to happen during early boot,
+and the file for `eth1` is correctly written by cloud-init.
+It is just not used.
+It might suffice to use a `runcmd:` statement in cloud-config
+to call `netplan apply`.
+I'll try that next.
+
+I'll omit most of the output of `terraform apply`:
+
+```
+[...output omitted...]
+Apply complete! Resources: 13 added, 0 changed, 0 destroyed.
+
+Outputs:
+
+VPC_prefix = 10.42.0.0/16
+eip_ip = 3.123.161.19
+eip_name = ec2-3-123-161-19.eu-central-1.compute.amazonaws.com
+eip_private_ip = 10.42.255.157
+eip_private_name = ip-10-42-255-157.eu-central-1.compute.internal
+eni_private_ip = 10.42.0.204
+jump_host_ip = 18.184.28.128
+jump_host_name = ec2-18-184-28-128.eu-central-1.compute.amazonaws.com
+jump_host_privat_ip = 10.42.255.218
+jump_host_privat_name = ip-10-42-255-218.eu-central-1.compute.internal
+private_host_ip = 10.42.0.110
+private_host_name = ip-10-42-0-110.eu-central-1.compute.internal
+private_subnet_prefix = 10.42.0.0/24
+public_subnet_prefix = 10.42.255.0/24
+web_server_ip = 18.195.161.233
+web_server_name = ec2-18-195-161-233.eu-central-1.compute.amazonaws.com
+web_server_private_ip = 10.42.255.157
+web_server_private_name = ip-10-42-255-157.eu-central-1.compute.internal
+$ ssh ubuntu@18.184.28.128
+The authenticity of host '18.184.28.128 (18.184.28.128)' can't be established.
+ECDSA key fingerprint is SHA256:1sAnghIyduw2Lz6wJeDDC1uQOquJyy9Wj+Bj8knOuFU.
+Are you sure you want to continue connecting (yes/no)? yes
+Warning: Permanently added '18.184.28.128' (ECDSA) to the list of known hosts.
+Welcome to Ubuntu 18.04.4 LTS (GNU/Linux 4.15.0-1065-aws x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/advantage
+
+  System information as of Mon Apr 27 19:41:33 UTC 2020
+
+  System load:  0.07              Processes:           89
+  Usage of /:   16.1% of 7.69GB   Users logged in:     0
+  Memory usage: 17%               IP address for eth0: 10.42.255.218
+  Swap usage:   0%                IP address for eth1: 10.42.0.204
+
+0 packages can be updated.
+0 updates are security updates.
+
+
+
+The programs included with the Ubuntu system are free software;
+the exact distribution terms for each program are described in the
+individual files in /usr/share/doc/*/copyright.
+
+Ubuntu comes with ABSOLUTELY NO WARRANTY, to the extent permitted by
+applicable law.
+
+To run a command as administrator (user "root"), use "sudo <command>".
+See "man sudo_root" for details.
+
+ubuntu@ip-10-42-255-218:~$ ip a
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host
+       valid_lft forever preferred_lft forever
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9001 qdisc fq_codel state UP group default qlen 1000
+    link/ether 0a:c3:84:e5:0e:20 brd ff:ff:ff:ff:ff:ff
+    inet 10.42.255.218/24 brd 10.42.255.255 scope global dynamic eth0
+       valid_lft 3442sec preferred_lft 3442sec
+    inet6 fe80::8c3:84ff:fee5:e20/64 scope link
+       valid_lft forever preferred_lft forever
+3: eth1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9001 qdisc fq_codel state UP group default qlen 1000
+    link/ether 0a:f3:b0:91:9a:c0 brd ff:ff:ff:ff:ff:ff
+    inet 10.42.0.204/24 brd 10.42.0.255 scope global dynamic eth1
+       valid_lft 3442sec preferred_lft 3442sec
+    inet6 fe80::8f3:b0ff:fe91:9ac0/64 scope link
+       valid_lft forever preferred_lft forever
+ubuntu@ip-10-42-255-218:~$ logout
+Connection to 18.184.28.128 closed.
+```
+
+So this *did* work.
+I cannot say I like it,
+but it is not sufficiently important for me to investigate this further.
+I really hope this hack is not the intended way of using cloud-init
+to make use of an additional network interface.
+
+I'll just run the `connectivity_test` script before destroying the
+AWS deployment:
+
+```
+$ ./connectivity_test
+--> connecting to elastic IP address via IP address...
+Warning: Permanently added '3.123.161.19' (ECDSA) to the list of known hosts.
+--> OK
+--> connecting to elastic IP address via DNS name...
+Warning: Permanently added 'ec2-3-123-161-19.eu-central-1.compute.amazonaws.com,3.123.161.19' (ECDSA) to the list of known hosts.
+--> OK
+--> connecting to jump server via IP address...
+Warning: Permanently added '18.184.28.128' (ECDSA) to the list of known hosts.
+--> OK
+--> connecting to jump server via DNS name...
+Warning: Permanently added 'ec2-18-184-28-128.eu-central-1.compute.amazonaws.com,18.184.28.128' (ECDSA) to the list of known hosts.
+--> OK
+--> accessing web page via IP address...
+--> OK
+--> accessing web page via DNS name...
+--> OK
+--> connecting via jump host to host on private subnet...
+Warning: Permanently added '10.42.0.110' (ECDSA) to the list of known hosts.
+--> OK
+--> testing internal connectivity of host on private subnet...
+Warning: Permanently added '10.42.0.110' (ECDSA) to the list of known hosts.
+PING 10.42.255.157 (10.42.255.157) 56(84) bytes of data.
+64 bytes from 10.42.255.157: icmp_seq=1 ttl=64 time=0.325 ms
+64 bytes from 10.42.255.157: icmp_seq=2 ttl=64 time=0.386 ms
+
+--- 10.42.255.157 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1001ms
+rtt min/avg/max/mdev = 0.325/0.355/0.386/0.035 ms
+--> OK
+--> testing for no external connectivity of host on private subnet...
+Warning: Permanently added '10.42.0.110' (ECDSA) to the list of known hosts.
+PING 8.8.8.8 (8.8.8.8) 56(84) bytes of data.
+
+--- 8.8.8.8 ping statistics ---
+2 packets transmitted, 0 received, 100% packet loss, time 1001ms
+
+--> OK
+
+==> All tests passed successfully, :-)
+$ terraform destroy
+aws_vpc.ex4_vpc: Refreshing state... [id=vpc-0c69dbb6025b0fff8]
+aws_key_pair.course_ssh_key: Refreshing state... [id=tf-pubcloud2020]
+data.aws_ami.gnu_linux_image: Refreshing state...
+aws_internet_gateway.ex4_igw: Refreshing state... [id=igw-00052c66e1f7b040c]
+aws_subnet.ex4_public: Refreshing state... [id=subnet-084f6e5aff2a08655]
+aws_default_security_group.def_sg: Refreshing state... [id=sg-0acc43128309b3078]
+aws_route_table.ex4_rt: Refreshing state... [id=rtb-0e270e94e9e865965]
+aws_instance.ex4_jump: Refreshing state... [id=i-034f22d7ab86afa0d]
+aws_subnet.ex4_private: Refreshing state... [id=subnet-037d58ed1c2b75fd9]
+aws_instance.ex4_web: Refreshing state... [id=i-0db47b1264c03d025]
+aws_route_table_association.rt2public: Refreshing state... [id=rtbassoc-0974f9513eaefe980]
+aws_instance.ex4_other: Refreshing state... [id=i-097ffa48b78319d5b]
+aws_eip.ex4_eip: Refreshing state... [id=eipalloc-0b3ca89666c84274b]
+aws_network_interface.ex4_eni: Refreshing state... [id=eni-0aea24c0c5c0fe26a]
+
+An execution plan has been generated and is shown below.
+Resource actions are indicated with the following symbols:
+  - destroy
+
+[...lot's of output omitted...]
+Destroy complete! Resources: 13 destroyed.
+```
+
+## That's All Folks!
 
 Another long exercise solution description comes to an end.
 
