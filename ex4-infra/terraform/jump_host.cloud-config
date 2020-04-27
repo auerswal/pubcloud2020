@@ -2,3 +2,13 @@
 #cloud-config
 package_update: true
 package_upgrade: true
+write_files:
+  - path: /etc/netplan/51-eth1.yaml
+    owner: 'root:root'
+    permissions: '0644'
+    content: |
+      network:
+          version: 2
+          ethernets:
+              eth1:
+                  dhcp4: true
