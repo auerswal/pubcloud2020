@@ -90,8 +90,9 @@ resource "aws_subnet" "ex4_public" {
 
 # a new (private) subnet in the new VPC
 resource "aws_subnet" "ex4_private" {
-  vpc_id     = aws_vpc.ex4_vpc.id
-  cidr_block = var.priv_prefix
+  vpc_id            = aws_vpc.ex4_vpc.id
+  availability_zone = aws_subnet.ex4_public.availability_zone
+  cidr_block        = var.priv_prefix
   tags = {
     Name = "Ex. 4 private subnet"
   }
