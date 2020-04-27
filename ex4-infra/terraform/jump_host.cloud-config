@@ -12,3 +12,5 @@ write_files:
           ethernets:
               eth1:
                   dhcp4: true
+runcmd:
+  - [ netplan, apply ]
