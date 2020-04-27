@@ -847,8 +847,8 @@ web_server_name = ec2-54-93-244-69.eu-central-1.compute.amazonaws.com
 That looks promising.
 Let's find out what happened. ;-)
 
-*Spoiler:
-I messed up the output definitions for the other VM in the private subnet.*
+(*Spoiler:
+I messed up the output definitions for the other VM in the private subnet.*)
 
 Terraform can `show` the deployment:
 
@@ -3905,8 +3905,9 @@ ssh: Could not resolve hostname null: Name or service not known
 
 ## Fixing an Omission
 
-After re-reading the exercise description I noticed
-that the EIP should have a manual dependency in the Internet Gateway.
+After re-reading my exercise solution description I noticed
+that the EIP should have a manual dependency in the Internet Gateway,
+but I forgot this.
 Thus I added this to the terraform configuration,
 but did not repeat any of the tests except running `terraform validate`:
 
@@ -4443,7 +4444,7 @@ web_server_private_name = ip-10-42-255-116.eu-central-1.compute.internal
 
 Well this did report success,
 but the ENI was created after the EC2 instance,
-thus it may be for cloud-init to detect and configure it.
+thus it may be too late for cloud-init to detect and configure it.
 First let's test connectivity:
 
 ```
@@ -4649,7 +4650,8 @@ web_server_private_name = ip-10-42-255-153.eu-central-1.compute.internal
 ```
 
 After a short while,
-the jump host's `eth1` interface uses the AWS assigned IP address.
+the jump host's `eth1` interface uses the AWS assigned IP address
+in the private subnet.
 
 Now I just need to make it work on instance creation.
 As I see it,
@@ -4668,6 +4670,26 @@ It is just not used.
 It might suffice to use a `runcmd:` statement in cloud-config
 to call `netplan apply`.
 I'll try that next.
+
+```
+$ cat jump_host.cloud-config
+## template: jinja
+#cloud-config
+package_update: true
+package_upgrade: true
+write_files:
+  - path: /etc/netplan/51-eth1.yaml
+    owner: 'root:root'
+    permissions: '0644'
+    content: |
+      network:
+          version: 2
+          ethernets:
+              eth1:
+                  dhcp4: true
+runcmd:
+  - [ netplan, apply ]
+```
 
 I'll omit most of the output of `terraform apply`:
 
