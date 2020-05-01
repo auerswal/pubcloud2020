@@ -331,12 +331,14 @@ each using a different way to specify the template parameters:
     +----------+-----------+
     |  StackId |  StackId  |
     +----------+-----------+
+
     $ aws cloudformation create-stack --stack-name ex2-cfn --template-body file://vpc-template.yaml --parameters "$(< 01-initial-parameters.json)" --generate-cli-skeleton output
     ------------------------
     |      CreateStack     |
     +----------+-----------+
     |  StackId |  StackId  |
     +----------+-----------+
+
     $ aws cloudformation create-stack --stack-name ex2-cfn --template-body file://vpc-template.yaml --parameters file://01-initial-parameters.json --generate-cli-skeleton output
     ------------------------
     |      CreateStack     |
@@ -557,6 +559,7 @@ as can be seen both in the stack and VPC descriptions:
     |||  Ipv4Prefix                                     |  10.42.0.0/16                                                        |||
     |||  Name                                           |  CloudFormation-VPC                                                  |||
     ||+-------------------------------------------------+----------------------------------------------------------------------+||
+
     $ aws ec2 describe-vpcs --filter Name=isDefault,Values=false
     ----------------------------------------------------------------------------------------------------------------------------------------------
     |                                                                DescribeVpcs                                                                |
@@ -637,6 +640,7 @@ As a result a different VPC ID than before can be seen:
     |||  Ipv4Prefix                                     |  10.43.0.0/16                                                        |||
     |||  Name                                           |  CloudFormation-VPC                                                  |||
     ||+-------------------------------------------------+----------------------------------------------------------------------+||
+
     $ aws ec2 describe-vpcs --filter Name=isDefault,Values=false
     ----------------------------------------------------------------------------------------------------------------------------------------------
     |                                                                DescribeVpcs                                                                |
@@ -675,6 +679,7 @@ since I do not need it any more.
 I use the `aws cloudformation delete-stack` command for this:
 
     $ aws cloudformation delete-stack --stack-name ex2-cfn
+
     $ aws cloudformation describe-stacks
     ------------------------------------------------------------------------------------------------------------------------------
     |                                                       DescribeStacks                                                       |
@@ -704,6 +709,7 @@ I use the `aws cloudformation delete-stack` command for this:
     |||  Ipv4Prefix                                     |  10.43.0.0/16                                                        |||
     |||  Name                                           |  CloudFormation-VPC                                                  |||
     ||+-------------------------------------------------+----------------------------------------------------------------------+||
+
     $ sleep 5m ; aws cloudformation describe-stacks
     ----------------
     |DescribeStacks|
@@ -715,6 +721,7 @@ Now there are no more non-default VPCs:
     --------------
     |DescribeVpcs|
     +------------+
+
     $ aws ec2 describe-vpcs
     ---------------------------------------------------------------------------------------------------
     |                                          DescribeVpcs                                           |
@@ -963,6 +970,7 @@ I will save the plans to a local subdirectory `plans`
 and add the initial parameters:
 
     $ mkdir plans
+
     $ terraform plan --var-file 01-initial-parameters.tfvars -out plans/01-create-vpc.tfplan
     Refreshing Terraform state in-memory prior to plan...
     The refreshed state will be used to calculate this plan, but will not be
@@ -1014,6 +1022,7 @@ The Terraform plan is a ZIP archive:
 
     $ file plans/01-create-vpc.tfplan 
     plans/01-create-vpc.tfplan: Zip archive data, at least v2.0 to extract
+
     $ unzip -l plans/01-create-vpc.tfplan
     Archive:  plans/01-create-vpc.tfplan
       Length      Date    Time    Name
@@ -1457,6 +1466,7 @@ The Terraform state is now practically empty:
 
     $ terraform show
     
+
     $ cat terraform.tfstate
     {
       "version": 4,
@@ -1466,6 +1476,7 @@ The Terraform state is now practically empty:
       "outputs": {},
       "resources": []
     }
+
     $ diff -U0 terraform.tfstate.backup terraform.tfstate
     --- terraform.tfstate.backup    2020-03-08 18:48:20.524418822 +0100
     +++ terraform.tfstate   2020-03-08 18:48:20.596341300 +0100
@@ -1535,6 +1546,7 @@ and only the default VPC remains:
     --------------
     |DescribeVpcs|
     +------------+
+
     $ aws ec2 describe-vpcs
     ---------------------------------------------------------------------------------------------------
     |                                          DescribeVpcs                                           |
