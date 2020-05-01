@@ -717,7 +717,7 @@ Destroy complete! Resources: 10 destroyed.
 
 So the two questions have been answered:
 
-1. Apache needs to be explicitly enabled and started on amazon Linux 2.
+1. Apache needs to be explicitly enabled and started on Amazon Linux 2.
 2. A second *elastic network interface* (ENI) works out-of-the-box.
 
 ---
