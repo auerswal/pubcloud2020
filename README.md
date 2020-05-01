@@ -39,6 +39,8 @@ I'll add additional stuff not part of the hands-on exercises as well.
 
 1. [S3 Public Access Block](extra/s3-pab/) - controlling the S3 Public Access
    Block with Terraform
+2. [Amazon Linux 2](extra/amazon-linux2/) - playing with Amazon Linux 2, where
+   we install Apache and add a second network interface
 
 ---
 

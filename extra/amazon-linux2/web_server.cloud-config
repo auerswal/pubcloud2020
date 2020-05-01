@@ -1,0 +1,22 @@
+#cloud-config
+repo_update: true
+repo_upgrade: all
+packages:
+  - httpd
+write_files:
+  - path: /var/www/html/index.html
+    owner: 'root:root'
+    permissions: '0644'
+    content: |
+      <html>
+      <head>
+       <title>PubCloud 2020 - Extra - Amazon Linux 2</title>
+      </head>
+      <body>
+       <h1>PubCloud 2020 - Extra - Amazon Linux 2</h1>
+       <p>Static web site running on Amazon Linux 2</p>
+      </body>
+      </html>
+runcmd:
+  - [ systemctl, enable, httpd ]
+  - [ systemctl, start, httpd ]
