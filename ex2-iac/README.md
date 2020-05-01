@@ -184,10 +184,12 @@ AWS CLI configuration is saved in the directory `~/.aws/`:
 
     $ ls ~/.aws
     config  credentials
+
     $ cat ~/.aws/config
     [default]
     region = eu-central-1
     output = table
+
     $ sed -E 's/^([^=]+= ?).*$/\1<redacted>/' ~/.aws/credentials
     [default]
     aws_access_key_id = <redacted>
