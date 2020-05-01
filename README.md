@@ -32,6 +32,14 @@ as long as I think they can be a useful reference.
    private subnets, elastic IP address, elastic network interfaces, and
    three EC2 instances
 
+## Additional Stuff
+
+Since I want to use this repository as a reference,
+I'll add additional stuff not part of the hands-on exercises as well.
+
+1. [S3 Public Access Block](extra/s3-pab/) - controlling the S3 Public Access
+   Block with Terraform
+
 ---
 
 [My GitHub user page](https://github.com/auerswal) |
