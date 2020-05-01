@@ -15,6 +15,8 @@ I did find a workaround for the ENI problem,
 but the AWS documentation claims
 that Amazon Linux includes support for additional ENIs
 via the package `ec2-net-utils`.
+I expect this to just work,
+possibly after add the `ec2-net-utils` package to cloud-config.
 
 ## Simple Web Server with Two Network Interfaces
 
@@ -62,7 +64,7 @@ write_files:
 I use `terraform init` to initialize the Terraform workspace,
 `terraform fmt` and then `terraform validate` to format and check the
 configuration,
-and the `terraform apply`:
+and then `terraform apply`:
 
 ```
 $ terraform fmt
@@ -633,6 +635,8 @@ web_server_private_ip = 10.42.255.236
 web_server_private_name = ip-10-42-255-236.eu-central-1.compute.internal
 web_server_public_ip = 3.127.249.143
 web_server_public_name = ec2-3-127-249-143.eu-central-1.compute.amazonaws.com
+```
+```
 $ ssh ec2-user@ec2-3-127-249-143.eu-central-1.compute.amazonaws.com
 The authenticity of host 'ec2-3-127-249-143.eu-central-1.compute.amazonaws.com (3.127.249.143)' can't be established.
 ECDSA key fingerprint is SHA256:SnHJ1C1QSM8pfIpiTap+dAnAoCvwuLY47fUzgzfE1FM.
@@ -708,6 +712,13 @@ I clean up with `terraform destroy`, as always.
 [...output omitted...]
 Destroy complete! Resources: 10 destroyed.
 ```
+
+## Conclusion
+
+So the two questions have been answered:
+
+1. Apache needs to be explicitly enabled and started on amazon Linux 2.
+2. A second *elastic network interface* (ENI) works out-of-the-box.
 
 ---
 
