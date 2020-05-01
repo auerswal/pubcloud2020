@@ -182,18 +182,24 @@ Afterwards the AWS CLI is ready for use:
 
 AWS CLI configuration is saved in the directory `~/.aws/`:
 
-    $ ls ~/.aws
-    config  credentials
+```
+$ ls ~/.aws
+config  credentials
+```
 
-    $ cat ~/.aws/config
-    [default]
-    region = eu-central-1
-    output = table
+```
+$ cat ~/.aws/config
+[default]
+region = eu-central-1
+output = table
+```
 
-    $ sed -E 's/^([^=]+= ?).*$/\1<redacted>/' ~/.aws/credentials
-    [default]
-    aws_access_key_id = <redacted>
-    aws_secret_access_key = <redacted>
+```
+$ sed -E 's/^([^=]+= ?).*$/\1<redacted>/' ~/.aws/credentials
+[default]
+aws_access_key_id = <redacted>
+aws_secret_access_key = <redacted>
+```
 
 Using `aws configure` without options has created a configuration for
 the `default` profile.
