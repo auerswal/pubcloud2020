@@ -720,6 +720,8 @@ Loaded plugins: extras_suggestions, langpacks, priorities, update-motd
 No packages marked for update
 [ec2-user@ip-10-42-255-236 ~]$ logout
 Connection to ec2-3-127-249-143.eu-central-1.compute.amazonaws.com closed.
+```
+```
 $ lynx -dump ec2-user@ec2-3-127-249-143.eu-central-1.compute.amazonaws.com
                      PubCloud 2020 - Extra - Amazon Linux 2
 
