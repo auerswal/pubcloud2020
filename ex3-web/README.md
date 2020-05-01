@@ -127,14 +127,18 @@ This "key pair" can then be imported using the AWS CLI command
 This imports only the public key, i.e., half the key pair.
 At first, there are no key pairs:
 
-    $ aws ec2 describe-key-pairs
-    ------------------
-    |DescribeKeyPairs|
-    +----------------+
-    $ aws ec2 describe-key-pairs --output json
-    {
-          "KeyPairs": []
-    }
+```
+$ aws ec2 describe-key-pairs
+------------------
+|DescribeKeyPairs|
++----------------+
+```
+```
+$ aws ec2 describe-key-pairs --output json
+{
+      "KeyPairs": []
+}
+```
 
 Then I upload the public key I want to use:
 
@@ -164,10 +168,14 @@ I am not sure if this has worked correctly,
 because the key fingerprint shown in the AWS CLI output
 does *not* match the fingerprint shown by OpenSSH:
 
-    $ ssh-keygen -l -E md5 -f pubcloud2020_rsa_id.pub
-    4096 MD5:a6:a4:be:a2:7a:b5:bd:74:f6:75:7e:66:22:ad:22:ac auerswald@<redacted> (RSA)
-    $ awk '{print $2}' pubcloud2020_rsa_id.pub | base64 -d | md5sum
-    a6a4bea27ab5bd74f6757e6622ad22ac  -
+```
+$ ssh-keygen -l -E md5 -f pubcloud2020_rsa_id.pub
+4096 MD5:a6:a4:be:a2:7a:b5:bd:74:f6:75:7e:66:22:ad:22:ac auerswald@<redacted> (RSA)
+```
+```
+$ awk '{print $2}' pubcloud2020_rsa_id.pub | base64 -d | md5sum
+a6a4bea27ab5bd74f6757e6622ad22ac  -
+```
 
 A quick web search turns up the answer that AWS uses a different key format
 than OpenSSH when calculating the key fingerprint.
@@ -175,10 +183,14 @@ To calculate the AWS fingerprint,
 the key has to converted to the matching format first, i.e.,
 to a DER encoding:
 
-    $ ssh-keygen -e -m PKCS8 -f pubcloud2020_rsa_id.pub | openssl pkey -pubin -pubout -outform DER | md5sum
-    bcc0badec12da8385d0833badd18dbc4  -
-    $ aws ec2 describe-key-pairs --output text | fgrep PubCloud2020 | cut -f2 | tr -d :
-    bcc0badec12da8385d0833badd18dbc4
+```
+$ ssh-keygen -e -m PKCS8 -f pubcloud2020_rsa_id.pub | openssl pkey -pubin -pubout -outform DER | md5sum
+bcc0badec12da8385d0833badd18dbc4  -
+```
+```
+$ aws ec2 describe-key-pairs --output text | fgrep PubCloud2020 | cut -f2 | tr -d :
+bcc0badec12da8385d0833badd18dbc4
+```
 
 So in the end uploading (*importing*) the existing OpenSSH key did work
 correctly.
@@ -197,15 +209,21 @@ manually creating the resource.)
 Thus I will delete the manually uploaded public SSH key from AWS
 before continuing:
 
-    $ aws ec2 delete-key-pair --key-name PubCloud2020
-    $ aws ec2 describe-key-pairs
-    ------------------
-    |DescribeKeyPairs|
-    +----------------+
-    $ aws ec2 describe-key-pairs --output json
-    {
-          "KeyPairs": []
-    }
+```
+$ aws ec2 delete-key-pair --key-name PubCloud2020
+```
+```
+$ aws ec2 describe-key-pairs
+------------------
+|DescribeKeyPairs|
++----------------+
+```
+```
+$ aws ec2 describe-key-pairs --output json
+{
+      "KeyPairs": []
+}
+```
 
 As far as I understand it the default security group used for the default VPC
 does not allow SSH access.
@@ -312,158 +330,176 @@ and then remove that again,
 since I want to have the security group settings as part of the Terraform
 configuration.
 
-    $ aws ec2 describe-security-groups --output json
-    {
-        "SecurityGroups": [
-            {
-                "Description": "default VPC security group",
-                "GroupName": "default",
-                "IpPermissions": [
-                    {
-                        "IpProtocol": "-1",
-                        "IpRanges": [],
-                        "Ipv6Ranges": [],
-                        "PrefixListIds": [],
-                        "UserIdGroupPairs": [
-                            {
-                                "GroupId": "sg-805b23e7",
-                                "UserId": "143440624024"
-                            }
-                        ]
-                    }
-                ],
-                "OwnerId": "143440624024",
-                "GroupId": "sg-805b23e7",
-                "IpPermissionsEgress": [
-                    {
-                        "IpProtocol": "-1",
-                        "IpRanges": [
-                            {
-                                "CidrIp": "0.0.0.0/0"
-                            }
-                        ],
-                        "Ipv6Ranges": [],
-                        "PrefixListIds": [],
-                        "UserIdGroupPairs": []
-                    }
-                ],
-                "VpcId": "vpc-7f13dc15"
-            }
-        ]
-    }
-    $ aws ec2 authorize-security-group-ingress --group-name default --ip-permissions '[{"IpProtocol": "tcp", "FromPort": 22, "ToPort": 22, "IpRanges": [{"CidrIp": "0.0.0.0/0", "Description": "SSH access from the Internet"}]}, {"IpProtocol": "tcp", "FromPort": 80, "ToPort": 80, "IpRanges": [{"CidrIp": "0.0.0.0/0", "Description": "HTTP access from the Internet"}]}, {"IpProtocol": "tcp", "FromPort": 443, "ToPort": 443, "IpRanges": [{"CidrIp": "0.0.0.0/0", "Description": "HTTPS access from the Internet"}]}]'
-    $ aws ec2 describe-security-groups --output json
-    {
-        "SecurityGroups": [
-            {
-                "Description": "default VPC security group",
-                "GroupName": "default",
-                "IpPermissions": [
-                    {
-                        "FromPort": 80,
-                        "IpProtocol": "tcp",
-                        "IpRanges": [
-                            {
-                                "CidrIp": "0.0.0.0/0",
-                                "Description": "HTTP access from the Internet"
-                            }
-                        ],
-                        "Ipv6Ranges": [],
-                        "PrefixListIds": [],
-                        "ToPort": 80,
-                        "UserIdGroupPairs": []
-                    },
-                    {
-                        "IpProtocol": "-1",
-                        "IpRanges": [],
-                        "Ipv6Ranges": [],
-                        "PrefixListIds": [],
-                        "UserIdGroupPairs": [
-                            {
-                                "GroupId": "sg-805b23e7",
-                                "UserId": "143440624024"
-                            }
-                        ]
-                    },
-                    {
-                        "FromPort": 22,
-                        "IpProtocol": "tcp",
-                        "IpRanges": [
-                            {
-                                "CidrIp": "0.0.0.0/0",
-                                "Description": "SSH access from the Internet"
-                            }
-                        ],
-                        "Ipv6Ranges": [],
-                        "PrefixListIds": [],
-                        "ToPort": 22,
-                        "UserIdGroupPairs": []
-                    },
-                    {
-                        "FromPort": 443,
-                        "IpProtocol": "tcp",
-                        "IpRanges": [
-                            {
-                                "CidrIp": "0.0.0.0/0",
-                                "Description": "HTTPS access from the Internet"
-                            }
-                        ],
-                        "Ipv6Ranges": [],
-                        "PrefixListIds": [],
-                        "ToPort": 443,
-                        "UserIdGroupPairs": []
-                    }
-                ],
-                "OwnerId": "143440624024",
-                "GroupId": "sg-805b23e7",
-                "IpPermissionsEgress": [
-                    {
-                        "IpProtocol": "-1",
-                        "IpRanges": [
-                            {
-                                "CidrIp": "0.0.0.0/0"
-                            }
-                        ],
-                        "Ipv6Ranges": [],
-                        "PrefixListIds": [],
-                        "UserIdGroupPairs": []
-                    }
-                ],
-                "VpcId": "vpc-7f13dc15"
-            }
-        ]
-    }
-    $ aws ec2 describe-security-groups --output text
-    SECURITYGROUPS  default VPC security group      sg-805b23e7     default 143440624024    vpc-7f13dc15
-    IPPERMISSIONS   80      tcp     80
-    IPRANGES        0.0.0.0/0       HTTP access from the Internet
-    IPPERMISSIONS           -1
-    USERIDGROUPPAIRS        sg-805b23e7     143440624024
-    IPPERMISSIONS   22      tcp     22
-    IPRANGES        0.0.0.0/0       SSH access from the Internet
-    IPPERMISSIONS   443     tcp     443
-    IPRANGES        0.0.0.0/0       HTTPS access from the Internet
-    IPPERMISSIONSEGRESS     -1
-    IPRANGES        0.0.0.0/0
-    $ aws ec2 revoke-security-group-ingress --group-name default --protocol tcp --port 22 --cidr 0.0.0.0/0
-    $ aws ec2 describe-security-groups --output text
-    SECURITYGROUPS  default VPC security group      sg-805b23e7     default 143440624024    vpc-7f13dc15
-    IPPERMISSIONS   80      tcp     80
-    IPRANGES        0.0.0.0/0       HTTP access from the Internet
-    IPPERMISSIONS           -1
-    USERIDGROUPPAIRS        sg-805b23e7     143440624024
-    IPPERMISSIONS   443     tcp     443
-    IPRANGES        0.0.0.0/0       HTTPS access from the Internet
-    IPPERMISSIONSEGRESS     -1
-    IPRANGES        0.0.0.0/0
-    $ aws ec2 revoke-security-group-ingress --group-name default --protocol tcp --port 80 --cidr 0.0.0.0/0
-    $ aws ec2 revoke-security-group-ingress --group-name default --protocol tcp --port 443 --cidr 0.0.0.0/0
-    $ aws ec2 describe-security-groups --output text
-    SECURITYGROUPS  default VPC security group      sg-805b23e7     default 143440624024    vpc-7f13dc15
-    IPPERMISSIONS   -1
-    USERIDGROUPPAIRS        sg-805b23e7     143440624024
-    IPPERMISSIONSEGRESS     -1
-    IPRANGES        0.0.0.0/0
+```
+$ aws ec2 describe-security-groups --output json
+{
+    "SecurityGroups": [
+        {
+            "Description": "default VPC security group",
+            "GroupName": "default",
+            "IpPermissions": [
+                {
+                    "IpProtocol": "-1",
+                    "IpRanges": [],
+                    "Ipv6Ranges": [],
+                    "PrefixListIds": [],
+                    "UserIdGroupPairs": [
+                        {
+                            "GroupId": "sg-805b23e7",
+                            "UserId": "143440624024"
+                        }
+                    ]
+                }
+            ],
+            "OwnerId": "143440624024",
+            "GroupId": "sg-805b23e7",
+            "IpPermissionsEgress": [
+                {
+                    "IpProtocol": "-1",
+                    "IpRanges": [
+                        {
+                            "CidrIp": "0.0.0.0/0"
+                        }
+                    ],
+                    "Ipv6Ranges": [],
+                    "PrefixListIds": [],
+                    "UserIdGroupPairs": []
+                }
+            ],
+            "VpcId": "vpc-7f13dc15"
+        }
+    ]
+}
+```
+```
+$ aws ec2 authorize-security-group-ingress --group-name default --ip-permissions '[{"IpProtocol": "tcp", "FromPort": 22, "ToPort": 22, "IpRanges": [{"CidrIp": "0.0.0.0/0", "Description": "SSH access from the Internet"}]}, {"IpProtocol": "tcp", "FromPort": 80, "ToPort": 80, "IpRanges": [{"CidrIp": "0.0.0.0/0", "Description": "HTTP access from the Internet"}]}, {"IpProtocol": "tcp", "FromPort": 443, "ToPort": 443, "IpRanges": [{"CidrIp": "0.0.0.0/0", "Description": "HTTPS access from the Internet"}]}]'
+```
+```
+$ aws ec2 describe-security-groups --output json
+{
+    "SecurityGroups": [
+        {
+            "Description": "default VPC security group",
+            "GroupName": "default",
+            "IpPermissions": [
+                {
+                    "FromPort": 80,
+                    "IpProtocol": "tcp",
+                    "IpRanges": [
+                        {
+                            "CidrIp": "0.0.0.0/0",
+                            "Description": "HTTP access from the Internet"
+                        }
+                    ],
+                    "Ipv6Ranges": [],
+                    "PrefixListIds": [],
+                    "ToPort": 80,
+                    "UserIdGroupPairs": []
+                },
+                {
+                    "IpProtocol": "-1",
+                    "IpRanges": [],
+                    "Ipv6Ranges": [],
+                    "PrefixListIds": [],
+                    "UserIdGroupPairs": [
+                        {
+                            "GroupId": "sg-805b23e7",
+                            "UserId": "143440624024"
+                        }
+                    ]
+                },
+                {
+                    "FromPort": 22,
+                    "IpProtocol": "tcp",
+                    "IpRanges": [
+                        {
+                            "CidrIp": "0.0.0.0/0",
+                            "Description": "SSH access from the Internet"
+                        }
+                    ],
+                    "Ipv6Ranges": [],
+                    "PrefixListIds": [],
+                    "ToPort": 22,
+                    "UserIdGroupPairs": []
+                },
+                {
+                    "FromPort": 443,
+                    "IpProtocol": "tcp",
+                    "IpRanges": [
+                        {
+                            "CidrIp": "0.0.0.0/0",
+                            "Description": "HTTPS access from the Internet"
+                        }
+                    ],
+                    "Ipv6Ranges": [],
+                    "PrefixListIds": [],
+                    "ToPort": 443,
+                    "UserIdGroupPairs": []
+                }
+            ],
+            "OwnerId": "143440624024",
+            "GroupId": "sg-805b23e7",
+            "IpPermissionsEgress": [
+                {
+                    "IpProtocol": "-1",
+                    "IpRanges": [
+                        {
+                            "CidrIp": "0.0.0.0/0"
+                        }
+                    ],
+                    "Ipv6Ranges": [],
+                    "PrefixListIds": [],
+                    "UserIdGroupPairs": []
+                }
+            ],
+            "VpcId": "vpc-7f13dc15"
+        }
+    ]
+}
+```
+```
+$ aws ec2 describe-security-groups --output text
+SECURITYGROUPS  default VPC security group      sg-805b23e7     default 143440624024    vpc-7f13dc15
+IPPERMISSIONS   80      tcp     80
+IPRANGES        0.0.0.0/0       HTTP access from the Internet
+IPPERMISSIONS           -1
+USERIDGROUPPAIRS        sg-805b23e7     143440624024
+IPPERMISSIONS   22      tcp     22
+IPRANGES        0.0.0.0/0       SSH access from the Internet
+IPPERMISSIONS   443     tcp     443
+IPRANGES        0.0.0.0/0       HTTPS access from the Internet
+IPPERMISSIONSEGRESS     -1
+IPRANGES        0.0.0.0/0
+```
+```
+$ aws ec2 revoke-security-group-ingress --group-name default --protocol tcp --port 22 --cidr 0.0.0.0/0
+```
+```
+$ aws ec2 describe-security-groups --output text
+SECURITYGROUPS  default VPC security group      sg-805b23e7     default 143440624024    vpc-7f13dc15
+IPPERMISSIONS   80      tcp     80
+IPRANGES        0.0.0.0/0       HTTP access from the Internet
+IPPERMISSIONS           -1
+USERIDGROUPPAIRS        sg-805b23e7     143440624024
+IPPERMISSIONS   443     tcp     443
+IPRANGES        0.0.0.0/0       HTTPS access from the Internet
+IPPERMISSIONSEGRESS     -1
+IPRANGES        0.0.0.0/0
+```
+```
+$ aws ec2 revoke-security-group-ingress --group-name default --protocol tcp --port 80 --cidr 0.0.0.0/0
+```
+```
+$ aws ec2 revoke-security-group-ingress --group-name default --protocol tcp --port 443 --cidr 0.0.0.0/0
+```
+```
+$ aws ec2 describe-security-groups --output text
+SECURITYGROUPS  default VPC security group      sg-805b23e7     default 143440624024    vpc-7f13dc15
+IPPERMISSIONS   -1
+USERIDGROUPPAIRS        sg-805b23e7     143440624024
+IPPERMISSIONSEGRESS     -1
+IPRANGES        0.0.0.0/0
+```
 
 #### Start an EC2 Instance
 
@@ -523,22 +559,32 @@ and then upload the image file to the S3 bucket.
 
 #### Creating an Image
 
-    $ cat <<EOF | pbmtext | pnmmargin -back 1 | pnmmargin -white 1 | pnmtopng > s3/image.png
-    PubCloud 2020
-    Hands-on Exercise 3
-    Image File Stored in AWS S3
-    (C) 2020 Erik Auerswald
-    EOF
-    $ file s3/image.png
-    s3/image.png: PNG image data, 208 x 94, 1-bit grayscale, non-interlaced
+```
+$ cat <<EOF | pbmtext | pnmmargin -back 1 | pnmmargin -white 1 | pnmtopng > s3/image.png
+PubCloud 2020
+Hands-on Exercise 3
+Image File Stored in AWS S3
+(C) 2020 Erik Auerswald
+EOF
+```
+```
+$ file s3/image.png
+s3/image.png: PNG image data, 208 x 94, 1-bit grayscale, non-interlaced
+```
 
 #### Creating an S3 Bucket
 
-    $ aws s3 ls
-    $ aws s3 mb s3://pubcloud2020-website-auerswal
-    make_bucket: pubcloud2020-website-auerswal
-    $ aws s3 ls
-    2020-04-13 16:54:30 pubcloud2020-website-auerswal
+```
+$ aws s3 ls
+```
+```
+$ aws s3 mb s3://pubcloud2020-website-auerswal
+make_bucket: pubcloud2020-website-auerswal
+```
+```
+$ aws s3 ls
+2020-04-13 16:54:30 pubcloud2020-website-auerswal
+```
 
 #### Copying the Image to the Bucket
 
@@ -574,20 +620,28 @@ Activating the static website feature of the S3 bucket should not
 result in a publicly accessible website,
 since the default S3 bucket access controls prevent this.
 
-    $ aws s3 cp s3/index.html s3://pubcloud2020-website-auerswal/ --acl public-read
-    upload: s3/index.html to s3://pubcloud2020-website-auerswal/index.html
-    $ aws s3 ls pubcloud2020-website-auerswal
-    2020-04-13 16:58:18        644 image.png
-    2020-04-13 18:16:12        470 index.html
-    $ aws s3 website s3://pubcloud2020-website-auerswal --index-document index.html
-    $ aws s3api get-bucket-website --bucket pubcloud2020-website-auerswal
-    ----------------------------
-    |     GetBucketWebsite     |
-    +--------------------------+
-    ||      IndexDocument     ||
-    |+---------+--------------+|
-    ||  Suffix |  index.html  ||
-    |+---------+--------------+|
+```
+$ aws s3 cp s3/index.html s3://pubcloud2020-website-auerswal/ --acl public-read
+upload: s3/index.html to s3://pubcloud2020-website-auerswal/index.html
+```
+```
+$ aws s3 ls pubcloud2020-website-auerswal
+2020-04-13 16:58:18        644 image.png
+2020-04-13 18:16:12        470 index.html
+```
+```
+$ aws s3 website s3://pubcloud2020-website-auerswal --index-document index.html
+```
+```
+$ aws s3api get-bucket-website --bucket pubcloud2020-website-auerswal
+----------------------------
+|     GetBucketWebsite     |
++--------------------------+
+||      IndexDocument     ||
+|+---------+--------------+|
+||  Suffix |  index.html  ||
+|+---------+--------------+|
+```
 
 The website should reside at the URL
 http://pubcloud2020-website-auerswal.s3-website.eu-central-1.amazonaws.com
@@ -634,20 +688,29 @@ Now the S3 hosted static website is accessible:
        1. https://www.ipspace.net/PubCloud/
 
 I'll disable public access again for now.
+
 Since I want to use Terraform,
 I'll delete the manually created bucket:
 
-    $ aws s3 ls
-    2020-04-13 19:05:20 pubcloud2020-website-auerswal
-    $ aws s3 ls s3://pubcloud2020-website-auerswal
-    2020-04-13 16:58:18        644 image.png
-    2020-04-13 18:55:40        547 index.html
-    $ aws s3 rb s3://pubcloud2020-website-auerswal --force
-    delete: s3://pubcloud2020-website-auerswal/index.html
-    delete: s3://pubcloud2020-website-auerswal/image.png
-    remove_bucket: pubcloud2020-website-auerswal
-    $ aws s3 ls
-    $
+```
+$ aws s3 ls
+2020-04-13 19:05:20 pubcloud2020-website-auerswal
+```
+```
+$ aws s3 ls s3://pubcloud2020-website-auerswal
+2020-04-13 16:58:18        644 image.png
+2020-04-13 18:55:40        547 index.html
+```
+```
+$ aws s3 rb s3://pubcloud2020-website-auerswal --force
+delete: s3://pubcloud2020-website-auerswal/index.html
+delete: s3://pubcloud2020-website-auerswal/image.png
+remove_bucket: pubcloud2020-website-auerswal
+```
+```
+$ aws s3 ls
+$
+```
 
 ### 5. Install and Enable a Web Server on the VM
 
@@ -909,15 +972,23 @@ After fixing a couple of mistakes
 and re-running `terraform fmt`
 the configuration is accepted:
 
-    $ terraform validate
-    
-    Error: Unsupported block type
-    [...further output omitted]
-    $ vi web_server.tf
-    $ terraform fmt
-    web_server.tf
-    $ terraform validate
-    Success! The configuration is valid.
+```
+$ terraform validate
+
+Error: Unsupported block type
+[...further output omitted]
+```
+```
+$ vi web_server.tf
+```
+```
+$ terraform fmt
+web_server.tf
+```
+```
+$ terraform validate
+Success! The configuration is valid.
+```
 
 Now I feel sufficiently confident to try and instantiate the Terraform
 configuration using `terraform apply`.
@@ -944,6 +1015,8 @@ I then fix the configuration and try again:
 $ terraform validate
 Success! The configuration is valid.
 
+```
+```
 $ terraform apply --var-file ubuntu.tfvars 
 data.aws_vpc.default: Refreshing state...
 data.aws_ami.gnu_linux_image: Refreshing state...
@@ -1247,8 +1320,12 @@ $ lynx -dump http://pubcloud2020-ex3-website-auerswal.s3-website.eu-central-1.am
 References
 
    1. https://www.ipspace.net/PubCloud/
+```
+```
 $ wget -q -O- http://pubcloud2020-ex3-website-auerswal.s3-website.eu-central-1.amazonaws.com/image.png | md5sum
 fcee1e0ebd394059c359e15bbd2b566e  -
+```
+```
 $ md5sum image.png
 fcee1e0ebd394059c359e15bbd2b566e  image.png
 ```
@@ -1563,6 +1640,8 @@ Then I verify via AWS CLI that the cloud resources have been removed:
 
 ```
 $ aws s3 ls
+```
+```
 $ aws ec2 describe-instances
 ----------------------------------------------------------------------------
 |                             DescribeInstances                            |
@@ -1667,6 +1746,8 @@ $ aws ec2 describe-instances
 ||||  Key           |  Name                                             ||||
 ||||  Value         |  Web_Server_EC2_Instance                          ||||
 |||+----------------+---------------------------------------------------+|||
+```
+```
 $ aws ec2 describe-vpcs
 ---------------------------------------------------------------------------------------------------
 |                                          DescribeVpcs                                           |
@@ -1687,6 +1768,8 @@ $ aws ec2 describe-vpcs
 |||+----------------------------------+--------------------------------------------------------+|||
 ||||  State                           |  associated                                            ||||
 |||+----------------------------------+--------------------------------------------------------+|||
+```
+```
 $ aws ec2 describe-security-groups
 ----------------------------------------------------------------------------------------------
 |                                   DescribeSecurityGroups                                   |
@@ -1721,6 +1804,8 @@ $ aws ec2 describe-security-groups
 |||+--------------------------------------------------------------------------------------+|||
 ||||  0.0.0.0/0                                                                           ||||
 |||+--------------------------------------------------------------------------------------+|||
+```
+```
 $ aws ec2 describe-key-pairs
 ------------------
 |DescribeKeyPairs|
