@@ -709,7 +709,6 @@ remove_bucket: pubcloud2020-website-auerswal
 ```
 ```
 $ aws s3 ls
-$
 ```
 
 ### 5. Install and Enable a Web Server on the VM
@@ -988,6 +987,7 @@ web_server.tf
 ```
 $ terraform validate
 Success! The configuration is valid.
+
 ```
 
 Now I feel sufficiently confident to try and instantiate the Terraform
