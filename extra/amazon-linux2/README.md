@@ -472,6 +472,36 @@ bash: ip: command not found
 
 We have seen before that the iproute2 binary `ip` is available.
 So all is not well with Amazon Linux 2 either.
+It seems as if the `PATH` variable is set too late.
+But SSH command mode does work,
+as can be seen in the output from later attempts
+(therefore we see different IP addresses and DNS names):
+
+```
+$ ssh ec2-user@ec2-3-121-87-192.eu-central-1.compute.amazonaws.com which ip
+which: no ip in (/usr/local/bin:/usr/bin)
+```
+```
+$ ssh ec2-user@ec2-3-121-87-192.eu-central-1.compute.amazonaws.com /sbin/ip a
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host
+       valid_lft forever preferred_lft forever
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9001 qdisc pfifo_fast state UP group default qlen 1000
+    link/ether 02:d2:58:01:cb:e2 brd ff:ff:ff:ff:ff:ff
+    inet 10.42.255.72/24 brd 10.42.255.255 scope global dynamic eth0
+       valid_lft 3523sec preferred_lft 3523sec
+    inet6 fe80::d2:58ff:fe01:cbe2/64 scope link
+       valid_lft forever preferred_lft forever
+3: eth1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 9001 qdisc pfifo_fast state UP group default qlen 1000
+    link/ether 02:51:2e:27:6b:22 brd ff:ff:ff:ff:ff:ff
+    inet 10.42.0.180/24 brd 10.42.0.255 scope global dynamic eth1
+       valid_lft 3545sec preferred_lft 3545sec
+    inet6 fe80::51:2eff:fe27:6b22/64 scope link
+       valid_lft forever preferred_lft forever
+```
 
 ### Trying Again
 
