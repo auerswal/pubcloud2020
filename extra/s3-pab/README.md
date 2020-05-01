@@ -5,15 +5,15 @@ As found out on
 the AWS CLI included in Ubuntu 18.04 LTS cannot control the
 *S3 Public Access Block*.
 Terraform *can*,
-but *destroyng* the respective resource
-does *not* re-instate the previous settings.
+but *destroying* the respective resource
+*does not* re-instate the previous settings.
 Thus I want to write a Terraform configuration
 that allows to easily control just this account wide setting.
 Instead of Terraform's *insecure by default*,
 I use a *secure by default* approach,
 i.e., *applying* the Terraform configuration
 [s3\_pab.tf](s3_pab.tf)
-in this directory without specifying any variables activates all blocks.
+in this directory without specifying any variable values activates all blocks.
 
 Let's see how this works.
 I have applied and destroyed the web server configuration
@@ -115,7 +115,7 @@ aws_s3_account_public_access_block.s3_pab: Modifications complete after 1s [id=1
 Apply complete! Resources: 0 added, 1 changed, 0 destroyed.
 ```
 
-The AWS Console no shows that all of the S3 Public Access Block is disabled.
+The AWS Console now shows that all of the S3 Public Access Block is disabled.
 
 Now I change the settings via AWS Console,
 because I want to try out to read the current state with `terraform refresh`:
@@ -140,8 +140,8 @@ resource "aws_s3_account_public_access_block" "s3_pab" {
 }
 ```
 
-Since I want to re-activate all of the S3 Public Access Block,
-I apply the Terraform configuration without variables again:
+Since I want to re-activate all of the S3 Public Access Block settings,
+I apply the Terraform configuration without variable values again:
 
 ```
 $ terraform apply
