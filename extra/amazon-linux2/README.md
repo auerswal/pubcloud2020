@@ -472,10 +472,13 @@ bash: ip: command not found
 
 We have seen before that the iproute2 binary `ip` is available.
 So all is not well with Amazon Linux 2 either.
-It seems as if the `PATH` variable is set too late.
+It seems as if the `PATH` variable is set too late,
+or perhaps in the wrong configuration file.
 But SSH command mode does work,
-as can be seen in the output from later attempts
-(therefore we see different IP addresses and DNS names):
+since Bash was invoked,
+but did not find the binary to execute.
+This can be seen in the output from later attempts
+(therefore we see different IP addresses and DNS names), too:
 
 ```
 $ ssh ec2-user@ec2-3-121-87-192.eu-central-1.compute.amazonaws.com which ip

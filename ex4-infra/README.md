@@ -97,44 +97,48 @@ the default VPC has Internet access,
 thus it should have an Internet Gateway.
 This can be confirmed using the AWS CLI:
 
-    $ aws ec2 describe-internet-gateways
-    -----------------------------------
-    |    DescribeInternetGateways     |
-    +---------------------------------+
-    ||       InternetGateways        ||
-    |+-------------------------------+|
-    ||       InternetGatewayId       ||
-    |+-------------------------------+|
-    ||  igw-5b1fdd30                 ||
-    |+-------------------------------+|
-    |||         Attachments         |||
-    ||+------------+----------------+||
-    |||    State   |     VpcId      |||
-    ||+------------+----------------+||
-    |||  available |  vpc-7f13dc15  |||
-    ||+------------+----------------+||
-    $ aws ec2 describe-vpcs --vpc-ids vpc-7f13dc15
-    --------------------------------------------------
-    |                  DescribeVpcs                  |
-    +------------------------------------------------+
-    ||                     Vpcs                     ||
-    |+-----------------------+----------------------+|
-    ||  CidrBlock            |  172.31.0.0/16       ||
-    ||  DhcpOptionsId        |  dopt-983cf3f2       ||
-    ||  InstanceTenancy      |  default             ||
-    ||  IsDefault            |  True                ||
-    ||  State                |  available           ||
-    ||  VpcId                |  vpc-7f13dc15        ||
-    |+-----------------------+----------------------+|
-    |||           CidrBlockAssociationSet          |||
-    ||+----------------+---------------------------+||
-    |||  AssociationId |  vpc-cidr-assoc-f576a99e  |||
-    |||  CidrBlock     |  172.31.0.0/16            |||
-    ||+----------------+---------------------------+||
-    ||||              CidrBlockState              ||||
-    |||+---------------+--------------------------+|||
-    ||||  State        |  associated              ||||
-    |||+---------------+--------------------------+|||
+```
+$ aws ec2 describe-internet-gateways
+-----------------------------------
+|    DescribeInternetGateways     |
++---------------------------------+
+||       InternetGateways        ||
+|+-------------------------------+|
+||       InternetGatewayId       ||
+|+-------------------------------+|
+||  igw-5b1fdd30                 ||
+|+-------------------------------+|
+|||         Attachments         |||
+||+------------+----------------+||
+|||    State   |     VpcId      |||
+||+------------+----------------+||
+|||  available |  vpc-7f13dc15  |||
+||+------------+----------------+||
+```
+```
+$ aws ec2 describe-vpcs --vpc-ids vpc-7f13dc15
+--------------------------------------------------
+|                  DescribeVpcs                  |
++------------------------------------------------+
+||                     Vpcs                     ||
+|+-----------------------+----------------------+|
+||  CidrBlock            |  172.31.0.0/16       ||
+||  DhcpOptionsId        |  dopt-983cf3f2       ||
+||  InstanceTenancy      |  default             ||
+||  IsDefault            |  True                ||
+||  State                |  available           ||
+||  VpcId                |  vpc-7f13dc15        ||
+|+-----------------------+----------------------+|
+|||           CidrBlockAssociationSet          |||
+||+----------------+---------------------------+||
+|||  AssociationId |  vpc-cidr-assoc-f576a99e  |||
+|||  CidrBlock     |  172.31.0.0/16            |||
+||+----------------+---------------------------+||
+||||              CidrBlockState              ||||
+|||+---------------+--------------------------+|||
+||||  State        |  associated              ||||
+|||+---------------+--------------------------+|||
+```
 
 ### Subnets and Route Tables
 
@@ -146,69 +150,73 @@ determine packet forwarding to destinations outside the subnet.
 
 The default VPC comprises subnets and route tables as well:
 
-    $ aws ec2 describe-subnets
-    ------------------------------------------------------
-    |                   DescribeSubnets                  |
-    +----------------------------------------------------+
-    ||                      Subnets                     ||
-    |+------------------------------+-------------------+|
-    ||  AssignIpv6AddressOnCreation |  False            ||
-    ||  AvailabilityZone            |  eu-central-1b    ||
-    ||  AvailableIpAddressCount     |  4091             ||
-    ||  CidrBlock                   |  172.31.32.0/20   ||
-    ||  DefaultForAz                |  True             ||
-    ||  MapPublicIpOnLaunch         |  True             ||
-    ||  State                       |  available        ||
-    ||  SubnetId                    |  subnet-e7d63b9b  ||
-    ||  VpcId                       |  vpc-7f13dc15     ||
-    |+------------------------------+-------------------+|
-    ||                      Subnets                     ||
-    |+------------------------------+-------------------+|
-    ||  AssignIpv6AddressOnCreation |  False            ||
-    ||  AvailabilityZone            |  eu-central-1c    ||
-    ||  AvailableIpAddressCount     |  4091             ||
-    ||  CidrBlock                   |  172.31.0.0/20    ||
-    ||  DefaultForAz                |  True             ||
-    ||  MapPublicIpOnLaunch         |  True             ||
-    ||  State                       |  available        ||
-    ||  SubnetId                    |  subnet-852cdcc9  ||
-    ||  VpcId                       |  vpc-7f13dc15     ||
-    |+------------------------------+-------------------+|
-    ||                      Subnets                     ||
-    |+------------------------------+-------------------+|
-    ||  AssignIpv6AddressOnCreation |  False            ||
-    ||  AvailabilityZone            |  eu-central-1a    ||
-    ||  AvailableIpAddressCount     |  4091             ||
-    ||  CidrBlock                   |  172.31.16.0/20   ||
-    ||  DefaultForAz                |  True             ||
-    ||  MapPublicIpOnLaunch         |  True             ||
-    ||  State                       |  available        ||
-    ||  SubnetId                    |  subnet-0207b068  ||
-    ||  VpcId                       |  vpc-7f13dc15     ||
-    |+------------------------------+-------------------+|
-    $ aws ec2 describe-route-tables
-    ----------------------------------------------------------------------------
-    |                            DescribeRouteTables                           |
-    +--------------------------------------------------------------------------+
-    ||                               RouteTables                              ||
-    |+-----------------------------------+------------------------------------+|
-    ||           RouteTableId            |               VpcId                ||
-    |+-----------------------------------+------------------------------------+|
-    ||  rtb-4c105026                     |  vpc-7f13dc15                      ||
-    |+-----------------------------------+------------------------------------+|
-    |||                             Associations                             |||
-    ||+---------+-------------------------------------+----------------------+||
-    |||  Main   |       RouteTableAssociationId       |    RouteTableId      |||
-    ||+---------+-------------------------------------+----------------------+||
-    |||  True   |  rtbassoc-62f0a00f                  |  rtb-4c105026        |||
-    ||+---------+-------------------------------------+----------------------+||
-    |||                                Routes                                |||
-    ||+-----------------------+---------------+--------------------+---------+||
-    ||| DestinationCidrBlock  |   GatewayId   |      Origin        |  State  |||
-    ||+-----------------------+---------------+--------------------+---------+||
-    |||  172.31.0.0/16        |  local        |  CreateRouteTable  |  active |||
-    |||  0.0.0.0/0            |  igw-5b1fdd30 |  CreateRoute       |  active |||
-    ||+-----------------------+---------------+--------------------+---------+||
+```
+$ aws ec2 describe-subnets
+------------------------------------------------------
+|                   DescribeSubnets                  |
++----------------------------------------------------+
+||                      Subnets                     ||
+|+------------------------------+-------------------+|
+||  AssignIpv6AddressOnCreation |  False            ||
+||  AvailabilityZone            |  eu-central-1b    ||
+||  AvailableIpAddressCount     |  4091             ||
+||  CidrBlock                   |  172.31.32.0/20   ||
+||  DefaultForAz                |  True             ||
+||  MapPublicIpOnLaunch         |  True             ||
+||  State                       |  available        ||
+||  SubnetId                    |  subnet-e7d63b9b  ||
+||  VpcId                       |  vpc-7f13dc15     ||
+|+------------------------------+-------------------+|
+||                      Subnets                     ||
+|+------------------------------+-------------------+|
+||  AssignIpv6AddressOnCreation |  False            ||
+||  AvailabilityZone            |  eu-central-1c    ||
+||  AvailableIpAddressCount     |  4091             ||
+||  CidrBlock                   |  172.31.0.0/20    ||
+||  DefaultForAz                |  True             ||
+||  MapPublicIpOnLaunch         |  True             ||
+||  State                       |  available        ||
+||  SubnetId                    |  subnet-852cdcc9  ||
+||  VpcId                       |  vpc-7f13dc15     ||
+|+------------------------------+-------------------+|
+||                      Subnets                     ||
+|+------------------------------+-------------------+|
+||  AssignIpv6AddressOnCreation |  False            ||
+||  AvailabilityZone            |  eu-central-1a    ||
+||  AvailableIpAddressCount     |  4091             ||
+||  CidrBlock                   |  172.31.16.0/20   ||
+||  DefaultForAz                |  True             ||
+||  MapPublicIpOnLaunch         |  True             ||
+||  State                       |  available        ||
+||  SubnetId                    |  subnet-0207b068  ||
+||  VpcId                       |  vpc-7f13dc15     ||
+|+------------------------------+-------------------+|
+```
+```
+$ aws ec2 describe-route-tables
+----------------------------------------------------------------------------
+|                            DescribeRouteTables                           |
++--------------------------------------------------------------------------+
+||                               RouteTables                              ||
+|+-----------------------------------+------------------------------------+|
+||           RouteTableId            |               VpcId                ||
+|+-----------------------------------+------------------------------------+|
+||  rtb-4c105026                     |  vpc-7f13dc15                      ||
+|+-----------------------------------+------------------------------------+|
+|||                             Associations                             |||
+||+---------+-------------------------------------+----------------------+||
+|||  Main   |       RouteTableAssociationId       |    RouteTableId      |||
+||+---------+-------------------------------------+----------------------+||
+|||  True   |  rtbassoc-62f0a00f                  |  rtb-4c105026        |||
+||+---------+-------------------------------------+----------------------+||
+|||                                Routes                                |||
+||+-----------------------+---------------+--------------------+---------+||
+||| DestinationCidrBlock  |   GatewayId   |      Origin        |  State  |||
+||+-----------------------+---------------+--------------------+---------+||
+|||  172.31.0.0/16        |  local        |  CreateRouteTable  |  active |||
+|||  0.0.0.0/0            |  igw-5b1fdd30 |  CreateRoute       |  active |||
+||+-----------------------+---------------+--------------------+---------+||
+```
 
 The default (*Main*) route table contains a default route
 to the default Internet Gateway.
@@ -1303,6 +1311,8 @@ $ aws ec2 describe-vpcs --filter Name=isDefault,Values=false
 |||  Key               |  Name                          |||
 |||  Value             |  Ex. 4 VPC                     |||
 ||+--------------------+--------------------------------+||
+```
+```
 $ aws ec2 describe-subnets --filter Name=vpc-id,Values=vpc-0b508a704edb473cb
 ---------------------------------------------------------------
 |                       DescribeSubnets                       |
@@ -1341,6 +1351,8 @@ $ aws ec2 describe-subnets --filter Name=vpc-id,Values=vpc-0b508a704edb473cb
 |||  Key          |  Name                                   |||
 |||  Value        |  Ex. 4 public subnet                    |||
 ||+---------------+-----------------------------------------+||
+```
+```
 $ aws ec2 describe-internet-gateways --filter Name=attachment.vpc-id,Values=vpc-0b508a704edb473cb
 --------------------------------------------
 |         DescribeInternetGateways         |
@@ -1363,6 +1375,8 @@ $ aws ec2 describe-internet-gateways --filter Name=attachment.vpc-id,Values=vpc-
 ||+-------+------------------------------+||
 |||  Name |  Ex. 4 Internet gateway      |||
 ||+-------+------------------------------+||
+```
+```
 $ aws ec2 describe-route-tables --filter Name=vpc-id,Values=vpc-0b508a704edb473cb
 -------------------------------------------------------------------------------------
 |                                DescribeRouteTables                                |
@@ -1409,6 +1423,8 @@ $ aws ec2 describe-route-tables --filter Name=vpc-id,Values=vpc-0b508a704edb473c
 |||  Key        |  Name                                                           |||
 |||  Value      |  Ex. 4 route table for Internet access                          |||
 ||+-------------+-----------------------------------------------------------------+||
+```
+```
 $ aws ec2 describe-instances
 ---------------------------------------------------------------------------------------
 |                                  DescribeInstances                                  |
@@ -1928,6 +1944,9 @@ I'll have to look into this...
 ...well, I messed up the output definitions.
 Thus the private IP given for the other VM
 was actually the private IP address of the jump host.
+I logged into the wrong host,
+i.e., I logged into the jump host from the jump host
+and then discovered that the jump host can access the Internet. ;-)
 I'll fix that and run `terraform apply` again:
 
 ```
@@ -2065,7 +2084,6 @@ to add them to the deployment.
 But first I want to show the current state of the Terraform configuration:
 
 ```
-$ cat vni.tf
 # Terraform configuration for AWS virtual network infrastructure.
 # Copyright (C) 2020  Erik Auerswald <auerswal@unix-ag.uni-kl.de>
 #
@@ -2360,6 +2378,8 @@ Again I'll use `terraform validate` and `terraform apply`:
 $ terraform validate
 Success! The configuration is valid.
 
+```
+```
 $ terraform apply
 aws_key_pair.course_ssh_key: Refreshing state... [id=tf-pubcloud2020]
 aws_vpc.ex4_vpc: Refreshing state... [id=vpc-0b508a704edb473cb]
@@ -2910,6 +2930,8 @@ $ lynx -dump 3.127.94.209
 References
 
    1. https://www.ipspace.net/PubCloud/
+```
+```
 $ lynx -dump ec2-3-127-94-209.eu-central-1.compute.amazonaws.com
           PubCloud 2020 - Exercise 4 - Virtual Network Infrastructure
 
@@ -2934,6 +2956,8 @@ $ timeout 10 lynx -dump 54.93.244.69
 
 Exiting via interrupt: 15
 
+```
+```
 $ timeout 10 lynx -dump ec2-54-93-244-69.eu-central-1.compute.amazonaws.com
 
 
@@ -2959,6 +2983,8 @@ if two network interfaces on the same subnet are accepted:
 $ terraform validate
 Success! The configuration is valid.
 
+```
+```
 $ terraform apply
 aws_vpc.ex4_vpc: Refreshing state... [id=vpc-0b508a704edb473cb]
 aws_key_pair.course_ssh_key: Refreshing state... [id=tf-pubcloud2020]
@@ -3046,6 +3072,7 @@ So Terraform *replaced* the ENI,
 because of the *tainted* status.
 The ENI is attached to the jump host
 and a private IP address is associated,
+so this is possible,
 but the Ubuntu 18.04 image does not activate it automatically:
 
 ```
@@ -3067,7 +3094,8 @@ $ ssh ubuntu@ec2-18-185-67-143.eu-central-1.compute.amazonaws.com ip a
 ```
 
 Activating the interface manually results in broken external
-connectivity to the jump host:
+connectivity to the jump host,
+probably because of ECMP use by the jump host:
 
 ```
 $ ssh ubuntu@ec2-18-185-67-143.eu-central-1.compute.amazonaws.com 
@@ -3151,14 +3179,16 @@ ubuntu@ip-10-42-255-147:~$ ip a
 
 I'd say I would need another subnet in the same availability
 zone as the public one
-to use the ENI.
-I'd rather remove the ENI from the configuration,
+to properly use the ENI.
+I'd rather remove the ENI from the configuration for now,
 since I do not really need it:
 
 ```
 $ terraform validate
 Success! The configuration is valid.
 
+```
+```
 $ terraform apply
 aws_vpc.ex4_vpc: Refreshing state... [id=vpc-0b508a704edb473cb]
 aws_network_interface.ex4_eni: Refreshing state... [id=eni-0932f51530cb1ea79]
@@ -3731,10 +3761,14 @@ $ aws ec2 describe-addresses
 -------------------
 |DescribeAddresses|
 +-----------------+
+```
+```
 $ aws ec2 describe-vpcs --filter Name=isDefault,Values=false
 --------------
 |DescribeVpcs|
 +------------+
+```
+```
 $ aws ec2 describe-instances
 ----------------------------------------------------------------------------
 |                             DescribeInstances                            |
@@ -3908,7 +3942,7 @@ ssh: Could not resolve hostname null: Name or service not known
 After re-reading my exercise solution description I noticed
 that the EIP should have a manual dependency in the Internet Gateway,
 but I forgot this.
-Thus I added this to the terraform configuration,
+Thus I added the dependency to the terraform configuration,
 but did not repeat any of the tests except running `terraform validate`:
 
 ```
@@ -3931,6 +3965,8 @@ Let's see if this works:
 $ terraform validate
 Success! The configuration is valid.
 
+```
+```
 $ terraform apply
 data.aws_ami.gnu_linux_image: Refreshing state...
 
@@ -4511,20 +4547,22 @@ destroy the deployment,
 and will try again
 (I'll omit the `terraform apply` output).
 
-That nearly worked,
-the netplan config file is found on the jump host,
+That nearly worked.
+The netplan config file is found on the jump host,
 but the interface is still not active:
 
 ```
 $ ssh "ubuntu@$(jq -r '.outputs.jump_host_name.value' terraform.tfstate)" ls /etc/netplan
 50-cloud-init.yaml
 51-eth1.yaml
+```
+```
 $ ssh "ubuntu@$(jq -r '.outputs.jump_host_name.value' terraform.tfstate)" ip a s dev eth1
 3: eth1: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN group default qlen 1000
     link/ether 02:fe:be:6c:ce:a4 brd ff:ff:ff:ff:ff:ff
 ```
 
-Loggin in and using `netplan apply` brings up the interface:
+Logging in and using `netplan apply` brings up the interface:
 
 ```
 $ ssh "ubuntu@$(jq -r '.outputs.jump_host_name.value' terraform.tfstate)"
@@ -4658,6 +4696,9 @@ As I see it,
 the problem lies in first creating the instance,
 and then attaching the ENI.
 Thus the cloud-init network configuration probably does not see the ENI.
+The Ubuntu image obviously is not able to activate a new network interface
+on the fly
+(this *does* work with *desktop* Ubuntu on physical hardware).
 
 I'll destroy the deployment,
 and look into it some more.
@@ -4666,13 +4707,12 @@ Perhaps it does work to just call `netplan apply` during boot.
 The initial cloud-init network configuration is documented
 to happen during early boot,
 and the file for `eth1` is correctly written by cloud-init.
-It is just not used.
+It is just not used automatically.
 It might suffice to use a `runcmd:` statement in cloud-config
 to call `netplan apply`.
 I'll try that next.
 
 ```
-$ cat jump_host.cloud-config
 ## template: jinja
 #cloud-config
 package_update: true
@@ -4717,6 +4757,8 @@ web_server_ip = 18.195.161.233
 web_server_name = ec2-18-195-161-233.eu-central-1.compute.amazonaws.com
 web_server_private_ip = 10.42.255.157
 web_server_private_name = ip-10-42-255-157.eu-central-1.compute.internal
+```
+```
 $ ssh ubuntu@18.184.28.128
 The authenticity of host '18.184.28.128 (18.184.28.128)' can't be established.
 ECDSA key fingerprint is SHA256:1sAnghIyduw2Lz6wJeDDC1uQOquJyy9Wj+Bj8knOuFU.
@@ -4823,6 +4865,8 @@ PING 8.8.8.8 (8.8.8.8) 56(84) bytes of data.
 --> OK
 
 ==> All tests passed successfully, :-)
+```
+```
 $ terraform destroy
 aws_vpc.ex4_vpc: Refreshing state... [id=vpc-0c69dbb6025b0fff8]
 aws_key_pair.course_ssh_key: Refreshing state... [id=tf-pubcloud2020]
