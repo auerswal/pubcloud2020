@@ -506,6 +506,10 @@ $ ssh ec2-user@ec2-3-121-87-192.eu-central-1.compute.amazonaws.com /sbin/ip a
        valid_lft forever preferred_lft forever
 ```
 
+The problem seems to be that `/usr/sbin` is added to the `PATH` in
+`/etc/profile`,
+thus only for interactive shells.
+
 ### Trying Again
 
 Anyway, let's continue and activate the web server.
