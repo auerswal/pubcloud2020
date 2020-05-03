@@ -510,6 +510,25 @@ The problem seems to be that `/usr/sbin` is added to the `PATH` in
 `/etc/profile`,
 thus only for interactive shells.
 
+#### Amazon Linux 2 as SSH Jump Host
+
+I would like to use the `ProxyJump` functionality of OpenSSH,
+even with Amazon Linux 2 as jump host.
+I have not looked into how this works exactly,
+but when I tried to use `ProxyJump` with the Windows 10 fork of OpenSSH,
+that SSH implementation failed with an error message
+that hints at creating another SSH process for *jumping*.
+While this were to be created on the client host,
+the options used for this helper SSH process suggest using it
+to start an SSH process on the jump host.
+The `ssh` binary is usually located in `/usr/bin/` and thus should
+be available for non-interactive sessions on Amazon Linux 2.
+Instead of checking all the parts and pieces,
+I just tried using the Amazon Linux 2 instance as an SSH jump host,
+which did work fine.
+Amazon Linux 2 can be used as an SSH jump host
+without any special configuration.
+
 ### Trying Again
 
 Anyway, let's continue and activate the web server.
