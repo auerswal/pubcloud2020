@@ -4821,6 +4821,10 @@ but it is not sufficiently important for me to investigate this further.
 I really hope this hack is not the intended way of using cloud-init
 to make use of an additional network interface.
 
+A second ENI
+[just works](../extra/amazon-linux2/)
+without any non-default configuration when using Amazon Linux 2.
+
 I'll just run the `connectivity_test` script before destroying the
 AWS deployment:
 
