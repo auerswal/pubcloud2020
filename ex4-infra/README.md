@@ -2975,6 +2975,18 @@ resource "aws_network_interface" "ex4_eni" {
     id = "eni-044cff70e2285fc5d"
 ```
 
+(The
+[`section`](https://github.com/auerswal/section/)
+filter above is program written by me in the Go programming language
+that works similarly to the `section` output modifier of Cisco IOS.
+While the Go implementation extends the `section` idea beyond that of IOS,
+I have written simple versions in
+[shell/Awk](https://github.com/auerswal/sft/blob/master/section),
+[Perl](https://github.com/auerswal/sft/blob/master/section.pl),
+and
+[Python](https://github.com/auerswal/sft/blob/master/section.py)
+that provide just an IOS like `section` as well.)
+
 I will try and change the ENI to attach to the public subnet.
 Thus it should be able to be attached to the jump host,
 if two network interfaces on the same subnet are accepted:
