@@ -1,4 +1,4 @@
-# Terraform configuration for AWS virtual network infrastructure.
+# Terraform configuration for dual-stack AWS virtual network infrastructure.
 # Copyright (C) 2020  Erik Auerswald <auerswal@unix-ag.uni-kl.de>
 #
 # This program is free software: you can redistribute it and/or modify
