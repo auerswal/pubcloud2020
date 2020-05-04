@@ -31,6 +31,8 @@ as long as I think they can be a useful reference.
 4. [Deploy a Virtual Network Infrastructure](ex4-infra/) - a VPC, public and
    private subnets, elastic IP address, elastic network interfaces, and
    three EC2 instances
+5. [Deploy IPv6 in Your Cloud Virtual Network](ex5-ipv6/) - where we find out
+   that IPv6 is different from IPv4
 
 ## Additional Stuff
 

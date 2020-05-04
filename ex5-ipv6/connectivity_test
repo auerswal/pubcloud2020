@@ -1,0 +1,157 @@
+#! /bin/bash
+
+# connectivity_test - check virtual network infrastructure connectivity
+# Copyright (C) 2020  Erik Auerswald <auerswal@unix-ag.uni-kl.de>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+set -e
+set -u
+
+TF_STATE=terraform/terraform.tfstate
+R_USER=ubuntu
+SSH_OPTS='-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null'
+
+# report test failure on error
+trap 'printf -- "***\n*** --- CONNECTIVITY TEST FAILED ---\n***\n"' ERR
+
+# extract address and name informationen from Terraform & AWS
+echo '--> determining IPv4 and IPv6 addresses, and DNS names...'
+EIP_IP=$(jq -r '.outputs.eip_ip.value' "$TF_STATE")
+echo "--> web server EIP IP:       $EIP_IP"
+EIP_DNS=$(jq -r '.outputs.eip_name.value' "$TF_STATE")
+echo "--> web server EIP DNS:      $EIP_DNS"
+W_IP6=$(jq -r '.outputs.web_server_ipv6.value[0]' "$TF_STATE")
+echo "--> web server IPv6:         $W_IP6"
+W_P_IP=$(jq -r '.outputs.web_server_private_ipv4.value' "$TF_STATE")
+echo "--> web server private IPv4: $W_P_IP"
+J_IP=$(jq -r '.outputs.jump_host_ipv4.value' "$TF_STATE")
+echo "--> jump host IPv4:          $J_IP"
+J_DNS=$(jq -r '.outputs.jump_host_name.value' "$TF_STATE")
+echo "--> jump host DNS:           $J_DNS"
+J_IP6=$(jq -r '.outputs.jump_host_ipv6.value[0]' "$TF_STATE")
+echo "--> jump host IPv6:          $J_IP6"
+ENI_ID=$(jq -r \
+          '.resources[]|select(.name=="ex5_eni").instances[].attributes.id' \
+          "$TF_STATE")
+ENI_IP6=$(aws ec2 describe-network-interfaces \
+          --filter Name=network-interface-id,Values="$ENI_ID" --output json \
+          | jq -r 'recurse|.Ipv6Address?|select(.!=null)')
+echo "--> jump host 2nd IPv6:      $ENI_IP6"
+P_IP=$(jq -r '.outputs.private_host_ipv4.value' "$TF_STATE")
+echo "--> other host IPv4:         $P_IP"
+P_IP6=$(jq -r '.outputs.private_host_ipv6.value[0]' "$TF_STATE")
+echo "--> other host IPv6:         $P_IP6"
+
+# test using IPv4 addresses
+echo '--> connecting via SSH to elastic IP address via IPv4 address...'
+ssh $SSH_OPTS "${R_USER}@${EIP_IP}" true
+echo '--> OK'
+echo '--> connecting via SSH to jump server via IPv4 address...'
+ssh $SSH_OPTS "${R_USER}@${J_IP}" true
+echo '--> OK'
+echo '--> accessing web page via IPv4 address...'
+wget -q -O/dev/null "http://${EIP_IP}/"
+echo '--> OK'
+echo '--> check that jump host is no web server (via IPv4)...'
+if wget -q -O/dev/null "http://${J_IP}/"
+then false
+else echo '--> OK'
+fi
+
+# test using DNS names
+echo '--> connecting via SSH to elastic IP address via DNS name...'
+ssh $SSH_OPTS "${R_USER}@${EIP_DNS}" true
+echo '--> OK'
+echo '--> connecting via SSH to web server via IPv6 address...'
+ssh $SSH_OPTS -l "${R_USER}" "${W_IP6}" true
+echo '--> OK'
+echo '--> accessing web page via DNS name...'
+wget -q -O/dev/null "http://${EIP_DNS}/"
+echo '--> OK'
+echo '--> connecting via SSH to jump server via DNS name...'
+ssh $SSH_OPTS "${R_USER}@${J_DNS}" true
+echo '--> OK'
+echo '--> check that jump host is no web server (via DNS)...'
+if wget -q -O/dev/null "http://${J_DNS}/"
+then false
+else echo '--> OK'
+fi
+
+# test using IPv6 addresses
+# AWS sends IPv6 default route on private subnet => IPv6 is broken
+#echo '--> check that 2nd ENI of jump host does not allow SSH via IPv6...'
+#if ssh $SSH_OPTS -l "${R_USER}" -6 "${ENI_IP6}" true
+#then false
+#else echo '--> OK'
+#fi
+echo '--> accessing web page via IPv6 address...'
+wget -q -O/dev/null "http://[${W_IP6}]/"
+echo '--> OK'
+# AWS sends IPv6 default route on private subnet => IPv6 is broken
+#echo '--> check that jump host is no web server (via IPv6)...'
+#if wget -q -O/dev/null "http://[${J_IP6}]/"
+#then false
+#else echo '--> OK'
+#fi
+echo '--> check that global IPv6 does not allow SSH access to private subnet...'
+if ssh $SSH_OPTS -l "${R_USER}" -6 "${P_IP6}" true
+then false
+else echo '--> OK'
+fi
+# AWS sends IPv6 default route on private subnet => IPv6 is broken
+#echo '--> connecting via SSH to jump server via IPv6 address...'
+#ssh $SSH_OPTS -l "${R_USER}" -6 "${J_IP6}" true
+#echo '--> OK'
+
+# access host on private subnet via jump host
+echo '--> connecting via SSH via jump host to host on private subnet...'
+echo '---> using private IPv4 address'
+ssh $SSH_OPTS -o"ProxyJump=${R_USER}@${J_IP}" "${R_USER}@${P_IP}" true
+echo '--> OK'
+# ProxyJump and IPv6 does not work, disable test
+#echo '---> using (global) IPv6 address'
+#ssh $SSH_OPTS -o"ProxyJump=${R_USER}@${J_IP}" -l "${R_USER}" -6 "${P_IP6}" true
+#echo '--> OK'
+
+# ping internal IP of web server from host on private subnet
+echo '--> testing internal IPv4 connectivity of host on private subnet...'
+ssh $SSH_OPTS -o"ProxyJump=${R_USER}@${J_IP}" "${R_USER}@${P_IP}" \
+  "ping -c2 $W_P_IP"
+echo '--> OK'
+echo '--> testing internal IPv6 connectivity of host on private subnet...'
+ssh $SSH_OPTS -o"ProxyJump=${R_USER}@${J_IP}" "${R_USER}@${P_IP}" \
+  "ping -c2 $W_IP6"
+echo '--> OK'
+
+# ping Google's 8.8.8.8 from host on private subnet
+echo '--> testing for no external v4 connectivity of host on private subnet...'
+if ssh $SSH_OPTS -o"ProxyJump=${R_USER}@${J_IP}" "${R_USER}@${P_IP}" \
+  'ping -c2 8.8.8.8'
+then false
+else echo '--> OK'
+fi
+
+# ping Google's 2001:4860:4860::8888 from host on private subnet
+echo '--> testing for no external v6 connectivity of host on private subnet...'
+if ssh $SSH_OPTS -o"ProxyJump=${R_USER}@${J_IP}" "${R_USER}@${P_IP}" \
+  'ping -c2 2001:4860:4860::8888'
+then false
+else echo '--> OK'
+fi
+
+# report success if this point in the script is reached
+echo
+echo '==> All tests passed successfully. :-)'
+echo
