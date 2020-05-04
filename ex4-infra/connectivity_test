@@ -19,8 +19,6 @@
 set -e
 set -u
 
-# jq -r '.outputs.web_server_ip.value' terraform/terraform.tfstate
-
 TF_STATE=terraform/terraform.tfstate
 R_USER=ubuntu
 SSH_OPTS='-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null'
@@ -48,13 +46,25 @@ J_DNS=$(jq -r '.outputs.jump_host_name.value' "$TF_STATE")
 ssh $SSH_OPTS "${R_USER}@${J_DNS}" true
 echo '--> OK'
 
-# access web page
+# access web page of web server
 echo '--> accessing web page via IP address...'
 wget -q -O/dev/null "http://${EIP_IP}/"
 echo '--> OK'
 echo '--> accessing web page via DNS name...'
 wget -q -O/dev/null "http://${EIP_DNS}/"
 echo '--> OK'
+
+# jump host is no web server
+echo '--> check that jump host is no web server (via IP)...'
+if wget -q -O/dev/null "http://${J_IP}/"
+then false
+else echo '--> OK'
+fi
+echo '--> check that jump host is no web server (via DNS)...'
+if wget -q -O/dev/null "http://${J_DNS}/"
+then false
+else echo '--> OK'
+fi
 
 # access host on private subnet via jump host
 echo '--> connecting via jump host to host on private subnet...'
@@ -75,9 +85,8 @@ W_P_IP=$(jq -r '.outputs.web_server_private_ip.value' "$TF_STATE")
 if ssh $SSH_OPTS -o "ProxyJump=${R_USER}@${J_IP}" "${R_USER}@${P_IP}" \
   'ping -c2 8.8.8.8'
 then false
-else true
+else echo '--> OK'
 fi
-echo '--> OK'
 
 # report success if this point in the script is reached
 echo
