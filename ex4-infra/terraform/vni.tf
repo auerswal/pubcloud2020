@@ -44,7 +44,7 @@ variable "pub_prefix" {
 
 ### data sources
 
-# AMI ID for web server
+# AMI ID for the three servers
 data "aws_ami" "gnu_linux_image" {
   owners      = [var.ami_owner]
   most_recent = true
