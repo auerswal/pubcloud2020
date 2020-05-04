@@ -50,8 +50,8 @@ no Internet Gateways,
 no route tables,
 and no routes.
 
-Instead of changing the default Security Group,
-I have created a new one in the [third exercise](../ex3-web/),
+I have created a new Security Group in the [third exercise](../ex3-web/),
+instead of changing the default one,
 and have then allowed SSH, HTTP, and HTTPS there.
 I did look into using the default Security Group,
 but decided against doing so,
@@ -59,7 +59,12 @@ because *destroying* the Terraform deployment would not have cleaned up
 the changes to the default Security Group.
 This is different here,
 because the default Security Group of a *new* VPC is configured.
-Removing the VPC should remove its default Security Group, too.
+Removing the VPC should (and does) remove its default Security Group, too.
+
+I would use a different approach with a restrictive default Security Group,
+and then require the selection of the appropriate Security Group for an instance
+to allow specific access.
+But I follow the exercise description here to see how everything works out.
 
 I have not yet created an
 [elastic IP address](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/elastic-ip-addresses-eip.html)
