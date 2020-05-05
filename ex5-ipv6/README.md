@@ -670,6 +670,19 @@ As expected, the GNU/Linux based EC2 instances do not need any changes
 to enable dual-stack IPv4 and IPv6 operation.
 This includes the Apache web server on Ubuntu 18.04 LTS.
 
+But the defaults result in a broken multihoming configuration for IPv6,
+which affects the jump host in my deployment.
+The IPv4 multihoming configuration is not perfect either,
+but it at least works for the tests.
+IPv4 is probably broken for some connections originating on the jump host.
+
+The multihoming problems are quite tricky,
+because they only affect *some* communications.
+Thus connectivity tests sometimes succeed, sometimes fail.
+With IPv4, connecting *to* the multihomed host works,
+and connecting *from* it to a destination inside the VPC does as well.
+With IPv6 this cannot be said any more.
+
 ## Connectivity Test
 
 Manual connectivity testing shows that the ENI does have an IPv6 address,
@@ -679,7 +692,8 @@ I can extract the ENI ID from the Terraform state,
 and then use the AWS CLI to retrieve the ENI attributes.
 
 Basic connectivity works,
-but IPv6 connectivity is broken due to the second elastic network interface.
+but IPv6 connectivity is broken for the jump host
+due to the second elastic network interface.
 I have adjusted the
 [`connectivity_test`](connectivity_test)
 to omit testing the broken parts. :-/
@@ -777,7 +791,7 @@ Only the first ENI is connected to a subnet with a real default route.
 While this does work with IPv4,
 it does not work with IPv6.
 
-This looked as follows during one test:
+The situation looked as follows during one test:
 
 ```
 $ ssh ubuntu@52.57.116.221 ip -6 r s ::/0
@@ -794,24 +808,71 @@ default via 10.42.0.1 dev eth1 proto dhcp src 10.42.0.163 metric 100
 The one IPv6 default route looks worse than the two IPv4 default routes,
 because it uses two *nexthops* for one route.
 Thus the source address used for reply packets does not help the Linux kernel
-select the *correct* route, i.e., *nexthop* of the *single* route.
-This is different in IPv4.
-
-I'd say that is another reason *not* to use additional network interfaces
-for EC2 instances.
-At least not if DHCPv6 and/or IPv6 Router Advertisments (RAs) are used to learn
-default routes.
-
-I *could* work around that using static configuration,
-but I do not want to.
-I do not want to disable accepting RAs on eth1 either.
+select the *correct* route, i.e., the *correct nexthop* of the *single* route.
+This is different in IPv4 with two default routes.
 
 It is simple to activate IPv6 in AWS,
 but that does not mean that everything *just works*,
 especially not the same as with IPv4.
 
-But as the successfull connectivity test to the web server via IPv6 shows,
-it does work as long as a sane setup is used.
+## Down the Rabbit Hole
+
+As the Ancients told us in
+[RFC 1122, section 3.3.4.1](https://tools.ietf.org/html/rfc1122#section-3.3.4.1),
+parapgraph (c):
+
+> This case presents the most difficult routing problems.
+> The choice of interface (i.e., the choice of first-hop
+> network) may significantly affect performance or even
+> reachability of remote parts of the Internet.
+
+Those wise sages could predict the problems we encountered with the
+then unknown IP protocol version 6.
+
+The jump host has learned of two routers via Router Advertisements.
+It regards both as potential default gateways.
+It cannot know if one is better than the other.
+Thus it sometimes chooses the wrong gateway.
+
+We could manually remove the unwanted nexthop from the default route,
+but due to periodic RAs it might come back.
+Even configuration learned via (any current version of) DHCP,
+but manually removed afterwards,
+may come back when the DHCP lease is renewed.
+
+Instead of relying on automatic address configuration,
+we might consider manual configuration.
+I do not think this is advisable.
+
+AWS could implement
+[RFC 4191](https://tools.ietf.org/html/rfc4191)
+*Default Router Preferences and More-Specific Routes*
+to send different RAs that distinguish between public and private subnets.
+The private subnet gateway could use a worse router preference.
+This could be implemented as a *nerd knob* of the *subnet* object.
+This could even result in a better IPv6 experience than the IPv4 one now.
+I won't hold my breath…
+
+## Just Say No!
+
+My advice would be to use neither multihoming
+nor private subnets on AWS.
+
+Use routing to create full connectivity,
+then apply security controls to restrict it.
+Translated to AWS that means subnets with complete routing tables
+for connectivity,
+and Security Groups to restrict communication.
+
+The AWS subnet construct is needed for Availability Zone use,
+but not for communication restrictions.
+
+But as Tony Hoare said in his
+[Turing Award lecture](https://dl.acm.org/doi/10.1145/358549.358561):
+
+> To have our best advice ignored is the common fate of all who take on
+> the role of consultant, ever since Cassandra pointed out the dangers
+> of bringing a wooden horse within the walls of Troy.
 
 ## Cleaning Up
 
