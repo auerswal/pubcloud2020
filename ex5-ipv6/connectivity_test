@@ -42,6 +42,10 @@ J_DNS=$(jq -r '.outputs.jump_host_name.value' "$TF_STATE")
 echo "--> jump host DNS:           $J_DNS"
 J_IP6=$(jq -r '.outputs.jump_host_ipv6.value[0]' "$TF_STATE")
 echo "--> jump host IPv6:          $J_IP6"
+J_P_IP=$(jq -r '.outputs.jump_host_privat_ipv4.value' "$TF_STATE")
+echo "--> jump host private IPv4:  $J_P_IP"
+ENI_IP=$(jq -r '.outputs.eni_private_ipv4.value' "$TF_STATE")
+echo "--> jump host 2nd IPv4:      $ENI_IP"
 ENI_ID=$(jq -r \
           '.resources[]|select(.name=="ex5_eni").instances[].attributes.id' \
           "$TF_STATE")
@@ -90,16 +94,14 @@ else echo '--> OK'
 fi
 
 # test using IPv6 addresses
-# AWS sends IPv6 default route on private subnet => IPv6 is broken
-#echo '--> check that 2nd ENI of jump host does not allow SSH via IPv6...'
-#if ssh $SSH_OPTS -l "${R_USER}" -6 "${ENI_IP6}" true
-#then false
-#else echo '--> OK'
-#fi
+echo '--> check that 2nd ENI of jump host does not allow SSH via IPv6...'
+if ssh $SSH_OPTS -l "${R_USER}" -6 "${ENI_IP6}" true
+then false
+else echo '--> OK'
+fi
 echo '--> accessing web page via IPv6 address...'
 wget -q -O/dev/null "http://[${W_IP6}]/"
 echo '--> OK'
-# AWS sends IPv6 default route on private subnet => IPv6 is broken
 #echo '--> check that jump host is no web server (via IPv6)...'
 #if wget -q -O/dev/null "http://[${J_IP6}]/"
 #then false
@@ -110,7 +112,6 @@ if ssh $SSH_OPTS -l "${R_USER}" -6 "${P_IP6}" true
 then false
 else echo '--> OK'
 fi
-# AWS sends IPv6 default route on private subnet => IPv6 is broken
 #echo '--> connecting via SSH to jump server via IPv6 address...'
 #ssh $SSH_OPTS -l "${R_USER}" -6 "${J_IP6}" true
 #echo '--> OK'
@@ -124,6 +125,10 @@ echo '--> OK'
 #echo '---> using (global) IPv6 address'
 #ssh $SSH_OPTS -o"ProxyJump=${R_USER}@${J_IP}" -l "${R_USER}" -6 "${P_IP6}" true
 #echo '--> OK'
+# use a manual "proxy jump" instead
+echo '---> using (global) IPv6 address'
+ssh $SSH_OPTS -A "${R_USER}@${J_IP}" "ssh $SSH_OPTS ${P_IP6} true"
+echo '--> OK'
 
 # ping internal IP of web server from host on private subnet
 echo '--> testing internal IPv4 connectivity of host on private subnet...'
@@ -133,6 +138,26 @@ echo '--> OK'
 echo '--> testing internal IPv6 connectivity of host on private subnet...'
 ssh $SSH_OPTS -o"ProxyJump=${R_USER}@${J_IP}" "${R_USER}@${P_IP}" \
   "ping -c2 $W_IP6"
+echo '--> OK'
+
+# ping internal IP of jump host eth0 from host on private subnet -> broken
+#echo '--> testing internal IPv4 connectivity of host on private subnet...'
+#ssh $SSH_OPTS -o"ProxyJump=${R_USER}@${J_IP}" "${R_USER}@${P_IP}" \
+#  "ping -c2 $J_P_IP"
+#echo '--> OK'
+echo '--> testing internal IPv6 connectivity of host on private subnet...'
+ssh $SSH_OPTS -o"ProxyJump=${R_USER}@${J_IP}" "${R_USER}@${P_IP}" \
+  "ping -c2 $J_IP6"
+echo '--> OK'
+
+# ping internal IP of jump host eth1 from host on private subnet
+echo '--> testing internal IPv4 connectivity of host on private subnet...'
+ssh $SSH_OPTS -o"ProxyJump=${R_USER}@${J_IP}" "${R_USER}@${P_IP}" \
+  "ping -c2 $ENI_IP"
+echo '--> OK'
+echo '--> testing internal IPv6 connectivity of host on private subnet...'
+ssh $SSH_OPTS -o"ProxyJump=${R_USER}@${J_IP}" "${R_USER}@${P_IP}" \
+  "ping -c2 $ENI_IP6"
 echo '--> OK'
 
 # ping Google's 8.8.8.8 from host on private subnet

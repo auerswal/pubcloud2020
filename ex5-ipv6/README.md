@@ -681,7 +681,24 @@ because they only affect *some* communications.
 Thus connectivity tests sometimes succeed, sometimes fail.
 With IPv4, connecting *to* the multihomed host works,
 and connecting *from* it to a destination inside the VPC does as well.
-With IPv6 this cannot be said any more.
+With IPv6 this cannot be said any more,
+because connections from outside the VPC to the jump host
+no longer work *reliably*.
+
+Multihoming resulted in VPC internal connectivity problems, too.
+Both for IPv4 and IPv6.
+
+**Update 2020-05-05:** Deactivating the `source_dest_check` improves
+both VPC internal and external IPv6 connectivity to the multihomed host.
+But at least external connectivity is not yet reliable.
+And since this did not fix internal IPv4 connectivity,
+I am doubtful about the IPv6 part as well.
+
+This is only needed for the multihomed host, of course.
+This change could not be applied with a simple edit and `terraform apply`,
+because Terraform could not figure out which ENI to adjust.
+Destroying and re-deploying did work,
+because at first the jump host EC2 instance is created with just one ENI.
 
 ## Connectivity Test
 
@@ -1405,6 +1422,268 @@ aws_vpc.ex5_vpc: Destruction complete after 4s
 
 Destroy complete! Resources: 13 destroyed.
 ```
+
+## Update 2020-05-05: More Successful Tests
+
+Without any changes in the Terraform configuration,
+so without changing the deployment,
+more connectivity tests can be successful:
+
+1. I replaced `-oProxyJump=...` with hand-rolled `ssh` chaining.
+2. I added more VPC internal ping checks.
+
+```
+$ ./connectivity_test
+--> determining IPv4 and IPv6 addresses, and DNS names...
+--> web server EIP IP:       54.93.43.252
+--> web server EIP DNS:      ec2-54-93-43-252.eu-central-1.compute.amazonaws.com
+--> web server IPv6:         2a05:d014:5ff:2bff:e3da:d870:a714:8e70
+--> web server private IPv4: 10.42.255.47
+--> jump host IPv4:          18.195.215.56
+--> jump host DNS:           ec2-18-195-215-56.eu-central-1.compute.amazonaws.com
+--> jump host IPv6:          2a05:d014:5ff:2bff:c467:7580:9f8e:d8bb
+--> jump host private IPv4:  10.42.255.69
+--> jump host 2nd IPv4:      10.42.0.102
+--> jump host 2nd IPv6:      2a05:d014:5ff:2b00:6b93:9d8e:48dc:806
+--> other host IPv4:         10.42.0.40
+--> other host IPv6:         2a05:d014:5ff:2b00:946:2228:20ee:4dad
+--> connecting via SSH to elastic IP address via IPv4 address...
+Warning: Permanently added '54.93.43.252' (ECDSA) to the list of known hosts.
+--> OK
+--> connecting via SSH to jump server via IPv4 address...
+Warning: Permanently added '18.195.215.56' (ECDSA) to the list of known hosts.
+--> OK
+--> accessing web page via IPv4 address...
+--> OK
+--> check that jump host is no web server (via IPv4)...
+--> OK
+--> connecting via SSH to elastic IP address via DNS name...
+Warning: Permanently added 'ec2-54-93-43-252.eu-central-1.compute.amazonaws.com,54.93.43.252' (ECDSA) to the list of known hosts.
+--> OK
+--> connecting via SSH to web server via IPv6 address...
+Warning: Permanently added '2a05:d014:5ff:2bff:e3da:d870:a714:8e70' (ECDSA) to the list of known hosts.
+--> OK
+--> accessing web page via DNS name...
+--> OK
+--> connecting via SSH to jump server via DNS name...
+Warning: Permanently added 'ec2-18-195-215-56.eu-central-1.compute.amazonaws.com,18.195.215.56' (ECDSA) to the list of known hosts.
+--> OK
+--> check that jump host is no web server (via DNS)...
+--> OK
+--> accessing web page via IPv6 address...
+--> OK
+--> check that global IPv6 does not allow SSH access to private subnet...
+ssh: connect to host 2a05:d014:5ff:2b00:946:2228:20ee:4dad port 22: Connection timed out
+--> OK
+--> connecting via SSH via jump host to host on private subnet...
+---> using private IPv4 address
+Warning: Permanently added '10.42.0.40' (ECDSA) to the list of known hosts.
+--> OK
+---> using (global) IPv6 address
+Warning: Permanently added '18.195.215.56' (ECDSA) to the list of known hosts.
+Warning: Permanently added '2a05:d014:5ff:2b00:946:2228:20ee:4dad' (ECDSA) to the list of known hosts.
+--> OK
+--> testing internal IPv4 connectivity of host on private subnet...
+Warning: Permanently added '10.42.0.40' (ECDSA) to the list of known hosts.
+PING 10.42.255.47 (10.42.255.47) 56(84) bytes of data.
+64 bytes from 10.42.255.47: icmp_seq=1 ttl=64 time=0.446 ms
+64 bytes from 10.42.255.47: icmp_seq=2 ttl=64 time=0.444 ms
+
+--- 10.42.255.47 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1007ms
+rtt min/avg/max/mdev = 0.444/0.445/0.446/0.001 ms
+--> OK
+--> testing internal IPv6 connectivity of host on private subnet...
+Warning: Permanently added '10.42.0.40' (ECDSA) to the list of known hosts.
+PING 2a05:d014:5ff:2bff:e3da:d870:a714:8e70(2a05:d014:5ff:2bff:e3da:d870:a714:8e70) 56 data bytes
+64 bytes from 2a05:d014:5ff:2bff:e3da:d870:a714:8e70: icmp_seq=1 ttl=64 time=0.374 ms
+64 bytes from 2a05:d014:5ff:2bff:e3da:d870:a714:8e70: icmp_seq=2 ttl=64 time=0.413 ms
+
+--- 2a05:d014:5ff:2bff:e3da:d870:a714:8e70 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1027ms
+rtt min/avg/max/mdev = 0.374/0.393/0.413/0.027 ms
+--> OK
+--> testing internal IPv4 connectivity of host on private subnet...
+Warning: Permanently added '10.42.0.40' (ECDSA) to the list of known hosts.
+PING 10.42.0.102 (10.42.0.102) 56(84) bytes of data.
+64 bytes from 10.42.0.102: icmp_seq=1 ttl=64 time=0.366 ms
+64 bytes from 10.42.0.102: icmp_seq=2 ttl=64 time=0.402 ms
+
+--- 10.42.0.102 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1018ms
+rtt min/avg/max/mdev = 0.366/0.384/0.402/0.018 ms
+--> OK
+--> testing internal IPv6 connectivity of host on private subnet...
+Warning: Permanently added '10.42.0.40' (ECDSA) to the list of known hosts.
+PING 2a05:d014:5ff:2b00:6b93:9d8e:48dc:806(2a05:d014:5ff:2b00:6b93:9d8e:48dc:806) 56 data bytes
+64 bytes from 2a05:d014:5ff:2b00:6b93:9d8e:48dc:806: icmp_seq=1 ttl=64 time=0.304 ms
+64 bytes from 2a05:d014:5ff:2b00:6b93:9d8e:48dc:806: icmp_seq=2 ttl=64 time=0.494 ms
+
+--- 2a05:d014:5ff:2b00:6b93:9d8e:48dc:806 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1026ms
+rtt min/avg/max/mdev = 0.304/0.399/0.494/0.095 ms
+--> OK
+--> testing for no external v4 connectivity of host on private subnet...
+Warning: Permanently added '10.42.0.40' (ECDSA) to the list of known hosts.
+PING 8.8.8.8 (8.8.8.8) 56(84) bytes of data.
+
+--- 8.8.8.8 ping statistics ---
+2 packets transmitted, 0 received, 100% packet loss, time 1007ms
+
+--> OK
+--> testing for no external v6 connectivity of host on private subnet...
+Warning: Permanently added '10.42.0.40' (ECDSA) to the list of known hosts.
+PING 2001:4860:4860::8888(2001:4860:4860::8888) 56 data bytes
+
+--- 2001:4860:4860::8888 ping statistics ---
+2 packets transmitted, 0 received, 100% packet loss, time 1008ms
+
+--> OK
+
+==> All tests passed successfully. :-)
+
+```
+
+After disabling the `source_dest_check`,
+some connectivity tests had a higher chance of working.
+A successful test run can be seen below.
+But please note that this worked just by chance,
+other test runs failed.
+
+```
+$ ./connectivity_test
+--> determining IPv4 and IPv6 addresses, and DNS names...
+--> web server EIP IP:       3.125.96.198
+--> web server EIP DNS:      ec2-3-125-96-198.eu-central-1.compute.amazonaws.com
+--> web server IPv6:         2a05:d014:2b2:d2ff:33e0:d4ff:8c56:d218
+--> web server private IPv4: 10.42.255.251
+--> jump host IPv4:          18.194.70.250
+--> jump host DNS:           ec2-18-194-70-250.eu-central-1.compute.amazonaws.com
+--> jump host IPv6:          2a05:d014:2b2:d2ff:c081:48e2:3d72:be1
+--> jump host private IPv4:  10.42.255.71
+--> jump host 2nd IPv4:      10.42.0.33
+--> jump host 2nd IPv6:      2a05:d014:2b2:d200:98f7:4a1f:6333:f372
+--> other host IPv4:         10.42.0.183
+--> other host IPv6:         2a05:d014:2b2:d200:27a4:64f3:255:e73f
+--> connecting via SSH to elastic IP address via IPv4 address...
+Warning: Permanently added '3.125.96.198' (ECDSA) to the list of known hosts.
+--> OK
+--> connecting via SSH to jump server via IPv4 address...
+Warning: Permanently added '18.194.70.250' (ECDSA) to the list of known hosts.
+--> OK
+--> accessing web page via IPv4 address...
+--> OK
+--> check that jump host is no web server (via IPv4)...
+--> OK
+--> connecting via SSH to elastic IP address via DNS name...
+Warning: Permanently added 'ec2-3-125-96-198.eu-central-1.compute.amazonaws.com,3.125.96.198' (ECDSA) to the list of known hosts.
+--> OK
+--> connecting via SSH to web server via IPv6 address...
+Warning: Permanently added '2a05:d014:2b2:d2ff:33e0:d4ff:8c56:d218' (ECDSA) to the list of known hosts.
+--> OK
+--> accessing web page via DNS name...
+--> OK
+--> connecting via SSH to jump server via DNS name...
+Warning: Permanently added 'ec2-18-194-70-250.eu-central-1.compute.amazonaws.com,18.194.70.250' (ECDSA) to the list of known hosts.
+--> OK
+--> check that jump host is no web server (via DNS)...
+--> OK
+--> check that 2nd ENI of jump host does not allow SSH via IPv6...
+ssh: connect to host 2a05:d014:2b2:d200:98f7:4a1f:6333:f372 port 22: Connection timed out
+--> OK
+--> accessing web page via IPv6 address...
+--> OK
+--> check that jump host is no web server (via IPv6)...
+--> OK
+--> check that global IPv6 does not allow SSH access to private subnet...
+ssh: connect to host 2a05:d014:2b2:d200:27a4:64f3:255:e73f port 22: Connection timed out
+--> OK
+--> connecting via SSH to jump server via IPv6 address...
+Warning: Permanently added '2a05:d014:2b2:d2ff:c081:48e2:3d72:be1' (ECDSA) to the list of known hosts.
+--> OK
+--> connecting via SSH via jump host to host on private subnet...
+---> using private IPv4 address
+Warning: Permanently added '10.42.0.183' (ECDSA) to the list of known hosts.
+--> OK
+---> using (global) IPv6 address
+Warning: Permanently added '18.194.70.250' (ECDSA) to the list of known hosts.
+Warning: Permanently added '2a05:d014:2b2:d200:27a4:64f3:255:e73f' (ECDSA) to the list of known hosts.
+--> OK
+--> testing internal IPv4 connectivity of host on private subnet...
+Warning: Permanently added '10.42.0.183' (ECDSA) to the list of known hosts.
+PING 10.42.255.251 (10.42.255.251) 56(84) bytes of data.
+64 bytes from 10.42.255.251: icmp_seq=1 ttl=64 time=0.364 ms
+64 bytes from 10.42.255.251: icmp_seq=2 ttl=64 time=0.435 ms
+
+--- 10.42.255.251 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1006ms
+rtt min/avg/max/mdev = 0.364/0.399/0.435/0.040 ms
+--> OK
+--> testing internal IPv6 connectivity of host on private subnet...
+Warning: Permanently added '10.42.0.183' (ECDSA) to the list of known hosts.
+PING 2a05:d014:2b2:d2ff:33e0:d4ff:8c56:d218(2a05:d014:2b2:d2ff:33e0:d4ff:8c56:d218) 56 data bytes
+64 bytes from 2a05:d014:2b2:d2ff:33e0:d4ff:8c56:d218: icmp_seq=1 ttl=64 time=0.430 ms
+64 bytes from 2a05:d014:2b2:d2ff:33e0:d4ff:8c56:d218: icmp_seq=2 ttl=64 time=0.407 ms
+
+--- 2a05:d014:2b2:d2ff:33e0:d4ff:8c56:d218 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1026ms
+rtt min/avg/max/mdev = 0.407/0.418/0.430/0.023 ms
+--> OK
+--> testing internal IPv6 connectivity of host on private subnet...
+Warning: Permanently added '10.42.0.183' (ECDSA) to the list of known hosts.
+PING 2a05:d014:2b2:d2ff:c081:48e2:3d72:be1(2a05:d014:2b2:d2ff:c081:48e2:3d72:be1) 56 data bytes
+64 bytes from 2a05:d014:2b2:d2ff:c081:48e2:3d72:be1: icmp_seq=1 ttl=64 time=0.307 ms
+64 bytes from 2a05:d014:2b2:d2ff:c081:48e2:3d72:be1: icmp_seq=2 ttl=64 time=0.415 ms
+
+--- 2a05:d014:2b2:d2ff:c081:48e2:3d72:be1 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1027ms
+rtt min/avg/max/mdev = 0.307/0.361/0.415/0.054 ms
+--> OK
+--> testing internal IPv4 connectivity of host on private subnet...
+Warning: Permanently added '10.42.0.183' (ECDSA) to the list of known hosts.
+PING 10.42.0.33 (10.42.0.33) 56(84) bytes of data.
+64 bytes from 10.42.0.33: icmp_seq=1 ttl=64 time=0.337 ms
+64 bytes from 10.42.0.33: icmp_seq=2 ttl=64 time=0.388 ms
+
+--- 10.42.0.33 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1015ms
+rtt min/avg/max/mdev = 0.337/0.362/0.388/0.031 ms
+--> OK
+--> testing internal IPv6 connectivity of host on private subnet...
+Warning: Permanently added '10.42.0.183' (ECDSA) to the list of known hosts.
+PING 2a05:d014:2b2:d200:98f7:4a1f:6333:f372(2a05:d014:2b2:d200:98f7:4a1f:6333:f372) 56 data bytes
+64 bytes from 2a05:d014:2b2:d200:98f7:4a1f:6333:f372: icmp_seq=1 ttl=64 time=0.386 ms
+64 bytes from 2a05:d014:2b2:d200:98f7:4a1f:6333:f372: icmp_seq=2 ttl=64 time=0.412 ms
+
+--- 2a05:d014:2b2:d200:98f7:4a1f:6333:f372 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1026ms
+rtt min/avg/max/mdev = 0.386/0.399/0.412/0.013 ms
+--> OK
+--> testing for no external v4 connectivity of host on private subnet...
+Warning: Permanently added '10.42.0.183' (ECDSA) to the list of known hosts.
+PING 8.8.8.8 (8.8.8.8) 56(84) bytes of data.
+
+--- 8.8.8.8 ping statistics ---
+2 packets transmitted, 0 received, 100% packet loss, time 1030ms
+
+--> OK
+--> testing for no external v6 connectivity of host on private subnet...
+Warning: Permanently added '10.42.0.183' (ECDSA) to the list of known hosts.
+PING 2001:4860:4860::8888(2001:4860:4860::8888) 56 data bytes
+
+--- 2001:4860:4860::8888 ping statistics ---
+2 packets transmitted, 0 received, 100% packet loss, time 1005ms
+
+--> OK
+
+==> All tests passed successfully. :-)
+
+```
+
+I'll keep the disabled `source_dest_check` in the Terraform configuration,
+because I think this is correct given Linux's multihoming behaviour.
+
+But I'll probably remove the additional ENI for the next exercise.
 
 ---
 

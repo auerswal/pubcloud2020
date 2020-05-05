@@ -227,12 +227,13 @@ resource "aws_instance" "ex5_web" {
 
 # jump host EC2 instance
 resource "aws_instance" "ex5_jump" {
-  depends_on    = [aws_internet_gateway.ex5_igw]
-  ami           = data.aws_ami.gnu_linux_image.id
-  instance_type = "t2.micro"
-  subnet_id     = aws_subnet.ex5_public.id
-  key_name      = aws_key_pair.course_ssh_key.id
-  user_data     = file("jump_host.cloud-config")
+  depends_on        = [aws_internet_gateway.ex5_igw]
+  ami               = data.aws_ami.gnu_linux_image.id
+  instance_type     = "t2.micro"
+  subnet_id         = aws_subnet.ex5_public.id
+  source_dest_check = false
+  key_name          = aws_key_pair.course_ssh_key.id
+  user_data         = file("jump_host.cloud-config")
   tags = {
     Name = "Ex. 5 jump host"
   }
@@ -259,7 +260,8 @@ resource "aws_eip" "ex5_eip" {
 
 # elastic network interface
 resource "aws_network_interface" "ex5_eni" {
-  subnet_id = aws_subnet.ex5_private.id
+  subnet_id         = aws_subnet.ex5_private.id
+  source_dest_check = false
   attachment {
     instance     = aws_instance.ex5_jump.id
     device_index = 1
