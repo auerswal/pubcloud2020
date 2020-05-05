@@ -1544,6 +1544,8 @@ PING 2001:4860:4860::8888(2001:4860:4860::8888) 56 data bytes
 
 ```
 
+## Update 2020-05-05: Disabling `source_dest_check`
+
 After disabling the `source_dest_check`,
 some connectivity tests had a higher chance of working.
 A successful test run can be seen below.
