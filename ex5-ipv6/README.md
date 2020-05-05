@@ -12,7 +12,7 @@ and the GNU/Linux operating system used for EC2 instances does as well.
 At a first glance,
 only the *elastic IP address* (EIP) does not support IPv6.
 This is one element to look out for.
-While the EIP *replaces* the public IP address
+While the EIP *replaces* the public IPv4 address
 that can be allocated to an EC2 instance,
 how does it interact with an IPv6 address allocated to the EC2 instance?
 
@@ -27,7 +27,7 @@ At a high level I'd say I need to implement three things:
 I have added IPv6 related arguments to the appropriate Terraform resources.
 Not all of those are actually documented,
 so this does require some trial and error.
-Not all Terraform resources are dual-stack enabled yet,
+Not all Terraform resources are dual stack enabled yet,
 e.g., the ENI resource does not provide an IPv6 attribute.
 
 Terraform does not provide additional DNS name attributes for IPv6 addresses,
@@ -35,8 +35,8 @@ and the reported DNS name has just an A record.
 
 A Security Group Rule can be specified with *both* IPv4 and IPv6 ranges,
 but then only the IPv4 rules are active.
-Terraform just accepts this *dual-stack* rule and deploys it without errors,
-it just does not allow IPv6 access.
+Terraform just accepts this *dual stack* rule and deploys it without errors,
+this just does not allow IPv6 access.
 The security rules need to be manually synchronized between IPv4 and IPv6.
 This might be possible by defining appropriate modules.
 
@@ -667,7 +667,7 @@ web_server_private_name = ip-10-42-255-136.eu-central-1.compute.internal
 ## No EC2 Instance Changes
 
 As expected, the GNU/Linux based EC2 instances do not need any changes
-to enable dual-stack IPv4 and IPv6 operation.
+to enable dual stack IPv4 and IPv6 operation.
 This includes the Apache web server on Ubuntu 18.04 LTS.
 
 But the defaults result in a broken multihoming configuration for IPv6,
@@ -787,8 +787,8 @@ PING 2001:4860:4860::8888(2001:4860:4860::8888) 56 data bytes
 The Ubuntu jump host learns two default routes each for both IPv4 and IPv6.
 One default route uses the first elastic network interface,
 the other uses the second.
-Only the first ENI is connected to a subnet with a real default route.
-While this does work with IPv4,
+Only the first ENI is connected to a subnet with an Internet connection.
+While this does mostly work with IPv4,
 it does not work with IPv6.
 
 The situation looked as follows during one test:
@@ -808,7 +808,8 @@ default via 10.42.0.1 dev eth1 proto dhcp src 10.42.0.163 metric 100
 The one IPv6 default route looks worse than the two IPv4 default routes,
 because it uses two *nexthops* for one route.
 Thus the source address used for reply packets does not help the Linux kernel
-select the *correct* route, i.e., the *correct nexthop* of the *single* route.
+select the *correct* route, i.e.,
+the *correct nexthop* of the *single IPv6* default route.
 This is different in IPv4 with two default routes.
 
 It is simple to activate IPv6 in AWS,
@@ -819,19 +820,19 @@ especially not the same as with IPv4.
 
 As the Ancients told us in
 [RFC 1122, section 3.3.4.1](https://tools.ietf.org/html/rfc1122#section-3.3.4.1),
-parapgraph (c):
+paragraph (c):
 
 > This case presents the most difficult routing problems.
 > The choice of interface (i.e., the choice of first-hop
 > network) may significantly affect performance or even
 > reachability of remote parts of the Internet.
 
-Those wise sages could predict the problems we encountered with the
+Those wise sages could predict the problems we encounter now with the
 then unknown IP protocol version 6.
 
 The jump host has learned of two routers via Router Advertisements.
 It regards both as potential default gateways.
-It cannot know if one is better than the other.
+It does not know if one is better than the other.
 Thus it sometimes chooses the wrong gateway.
 
 We could manually remove the unwanted nexthop from the default route,
@@ -842,7 +843,7 @@ may come back when the DHCP lease is renewed.
 
 Instead of relying on automatic address configuration,
 we might consider manual configuration.
-I do not think this is advisable.
+I do not think this is advisable in the public cloud.
 
 AWS could implement
 [RFC 4191](https://tools.ietf.org/html/rfc4191)
@@ -850,7 +851,8 @@ AWS could implement
 to send different RAs that distinguish between public and private subnets.
 The private subnet gateway could use a worse router preference.
 This could be implemented as a *nerd knob* of the *subnet* object.
-This could even result in a better IPv6 experience than the IPv4 one now.
+This could even result in a better IPv6 experience than the IPv4 one now,
+if combined with a decent Linux implementation of this mechanism.
 I won't hold my breath…
 
 ## Just Say No!
