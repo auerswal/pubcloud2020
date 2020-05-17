@@ -11,11 +11,11 @@ write_files:
     content: |
       <html>
       <head>
-       <title>PubCloud 2020 - Exercise 4 - Virtual Network Infrastructure</title>
+       <title>PubCloud 2020 - Exercise 5 - IPv6 in VNI</title>
       </head>
       <body>
-       <h1>PubCloud 2020 - Exercise 4 - Virtual Network Infrastructure</h1>
-       <p>This website is part of my solution to hands-on exercise 4
+       <h1>PubCloud 2020 - Exercise 5 - IPv6 in VNI</h1>
+       <p>This website is part of my solution to hands-on exercise 5
           of the <a href="https://www.ipspace.net/PubCloud/">Networking
           in Public Cloud Deployments</a> course in the spring of 2020.</p>
        <p>This request was served from host <b>{{v1.local_hostname}}</b> with
