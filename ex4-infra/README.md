@@ -2981,7 +2981,8 @@ resource "aws_network_interface" "ex4_eni" {
 ```
 
 (The
-[`section`](https://github.com/auerswal/section/)
+[`section`](https://www.unix-ag.uni-kl.de/~auerswal/section/)
+([git repository](https://github.com/auerswal/section/))
 filter above is program written by me in the Go programming language
 that works similarly to the `section` output modifier of Cisco IOS.
 While the Go implementation extends the `section` idea beyond that of IOS,
